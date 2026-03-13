@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+output/images/
+output/books/
+covers/*.png
+covers/*.jpg
+.venv/
+venv/
+.DS_Store
+*.zip
+.claude/
