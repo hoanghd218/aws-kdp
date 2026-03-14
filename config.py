@@ -64,6 +64,11 @@ THEMES = {
         "book_title": "Stars & Serenity: A Cozy Astronaut Coloring Book for Adults",
         "prompt_file": "prompts/cute_astronaut.txt",
     },
+    "cute_aliens": {
+        "name": "Cosmic Cuties",
+        "book_title": "Cosmic Cuties: A Cozy Alien Coloring Book for Adults",
+        "prompt_file": "prompts/cute_aliens.txt",
+    },
 }
 
 # --- Paths ---
