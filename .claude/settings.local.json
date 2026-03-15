@@ -47,7 +47,8 @@
       "Bash(cp plans/self_care_girl_plan.json delivery/self_care_girl/)",
       "Bash(cp output/images/self_care_girl/*.png delivery/self_care_girl/)",
       "Bash(chmod:*)",
-      "mcp__plugin_telegram_telegram__reply"
+      "mcp__plugin_telegram_telegram__reply",
+      "Bash(python generate_images.py --plan plans/tech_boy_adventure_plan.json --count 10)"
     ],
     "deny": [],
     "ask": []

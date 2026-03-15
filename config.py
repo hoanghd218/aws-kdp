@@ -242,6 +242,11 @@ THEMES = {
         "prompt_file": "output/vintage_travel_destinations/prompts.txt",
         "page_size": "8.5x8.5",
     },
+    "tech_boy_adventure": {
+        "name": "The Boy Who Learned Tech",
+        "book_title": "The Boy Who Learned Tech: A Coding Adventure Coloring Book for Kids Ages 6-12",
+        "prompt_file": "prompts/tech_boy_adventure.txt",
+    },
 }
 
 # --- Paths ---
