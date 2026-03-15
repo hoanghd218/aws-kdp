@@ -1,3 +1,4 @@
+
 ---
 name: create-hook
 description: Create hooks for Claude Code automation. USE WHEN user says 'create a hook', 'add a hook', 'automate when', 'trigger when', 'run automatically', 'after I save', 'before I commit', 'when file changes'.
