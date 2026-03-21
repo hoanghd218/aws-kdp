@@ -33,7 +33,19 @@
       "Skill(mkt-find-trend-videos-subscribed:*)",
       "mcp__mcp-registry__search_mcp_registry",
       "Bash(chmod +x /Users/hoangtran/Documents/Github/hoang-ai-marketing/.claude/skills/mkt-create-video-reels-text-overlay/scripts/render_reels.sh)",
-      "Bash(bash .claude/skills/mkt-create-video-reels-text-overlay/scripts/render_reels.sh --message \"4 Mùa Cuộc Sống — Jim Rohn:\\\\n1. Đông — Khó khăn sẽ đến, hãy chuẩn bị\\\\n2. Xuân — Cơ hội mở ra, hãy gieo hạt\\\\n3. Hạ — Bảo vệ thành quả khỏi cỏ dại\\\\n4. Thu — Gặt hái, rồi Đông lại quay lại\" --video workspace/assets/reels/videos/3.mp4 --music \"workspace/assets/reels/music/nhac truyen cam hung.mp3\" --watermark \"@hoang.ai\" --output workspace/content/reels-4-mua-remotion-test.mp4)"
+      "Bash(bash .claude/skills/mkt-create-video-reels-text-overlay/scripts/render_reels.sh --message \"4 Mùa Cuộc Sống — Jim Rohn:\\\\n1. Đông — Khó khăn sẽ đến, hãy chuẩn bị\\\\n2. Xuân — Cơ hội mở ra, hãy gieo hạt\\\\n3. Hạ — Bảo vệ thành quả khỏi cỏ dại\\\\n4. Thu — Gặt hái, rồi Đông lại quay lại\" --video workspace/assets/reels/videos/3.mp4 --music \"workspace/assets/reels/music/nhac truyen cam hung.mp3\" --watermark \"@hoang.ai\" --output workspace/content/reels-4-mua-remotion-test.mp4)",
+      "Bash(rm -f output/images/self_care_girl/page_29.png)",
+      "Bash(python generate_images.py --plan plans/self_care_girl_plan.json --start 28 --count 1)",
+      "Bash(rm -f output/images/self_care_girl/page_42.png)",
+      "Bash(python generate_images.py --plan plans/self_care_girl_plan.json --start 41 --count 1)",
+      "Bash(python generate_cover.py --theme self_care_girl --author \"BoBo Art\" --title \"Self-Care Girl Coloring Book\" --kdp-width 17.460 --kdp-height 11.250)",
+      "Bash(python build_pdf.py --theme self_care_girl --title \"Self-Care Girl Coloring Book\" --subtitle \"Cute Cozy Daily Routines for Relaxation and Stress Relief\")",
+      "Bash(rm -rf delivery/self_care_girl)",
+      "Bash(mkdir -p delivery/self_care_girl)",
+      "Bash(cp output/books/self_care_girl_coloring_book.pdf delivery/self_care_girl/)",
+      "Bash(cp covers/self_care_girl_cover.png delivery/self_care_girl/)",
+      "Bash(cp plans/self_care_girl_plan.json delivery/self_care_girl/)",
+      "Bash(cp output/images/self_care_girl/*.png delivery/self_care_girl/)"
     ],
     "deny": [],
     "ask": []

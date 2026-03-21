@@ -95,7 +95,21 @@ For each image at `output/images/{theme_key}/page_XX.png`:
 - No unwanted text, borders, frames, or decorative elements?
 - Clean lines without artifacts?
 
-#### Common Issues to Flag:
+#### Anatomy & Character Issues (CRITICAL — always check):
+- **Mirror/reflection creating duplicate character**: If a mirror or reflective surface shows a full character, it looks like 2 people on the page. Prompts for single-character pages should use "NO mirrors, NO reflections". Mark as REDO and fix the prompt to remove the mirror
+- **Multiple characters when only one intended**: Count all visible human figures including reflections, silhouettes, and partially visible people. If the prompt says "single character" but the image shows 2+ people, mark as REDO
+- **Partially visible second person**: A second character cut off at the edge, or only torso/limbs visible without a head — mark as REDO
+- **Multiple characters merging**: Two or more characters overlapping, sharing body parts, or blending into each other. AI often renders multi-character scenes with bodies fused together — mark as REDO
+- **Missing limbs**: Characters missing arms, legs, hands, or feet when they should be visible
+- **Missing or malformed heads**: Characters without a clear head, or with distorted facial features
+- **Extra fingers/limbs**: Characters with too many fingers, extra arms, or duplicate body parts
+- **Clothing without a person**: Empty clothing (shirt, dress) rendered without a body inside — mark as REDO
+- **Body horror**: Any grotesque, unnatural, or disturbing body proportions or anatomy
+- **Ghost characters**: Faint or partial second character appearing in the background when only one was intended
+
+**IMPORTANT**: Single-character prompts are safest. If a prompt mentions mirrors, vanity tables, or reflective surfaces, the AI will often render a full reflection that looks like a second person. When reviewing, always count the number of visible human figures (including reflections). When fixing prompts, add "NO mirrors, NO reflections" and change the scene to avoid reflective surfaces.
+
+#### Other Common Issues to Flag:
 - Text or letters appearing in the image
 - Color or gray shading (should be pure line art)
 - Too cluttered / too sparse

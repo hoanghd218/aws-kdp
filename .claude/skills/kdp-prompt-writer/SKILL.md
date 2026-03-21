@@ -89,7 +89,14 @@ Page prompts must cover diverse scenes/activities:
 - Different activities (cooking, reading, playing, sleeping, crafting)
 - Different moods (playful, peaceful, cozy, adventurous)
 - Main character in different poses/situations
-- Some solo, some with secondary characters (adults)
+
+**IMPORTANT — Avoid AI Body-Part Errors**: AI image generation (Gemini) frequently renders multiple characters with merged/fused bodies, missing limbs, extra arms, or overlapping anatomy — making them look deformed. To prevent this:
+- **Minimize the number of characters per scene** — fewer characters = fewer rendering errors
+- When multiple characters appear, they must be **clearly separated** with space between them (no touching, overlapping, or intertwined poses)
+- Prefer a **pet companion** (cat, dog, bunny) over a second human character — animals are simpler to render correctly
+- Avoid prompts with physically close interactions (hugging, holding hands, dancing together) — these cause body-part fusion errors
+- Add "IMPORTANT: Each character must have clearly defined, complete body with no overlapping or merged body parts" to every prompt that includes more than one character
+- Background characters (e.g., vendors at a market) are acceptable only if they are small, distant, and clearly separated from the main character
 
 ### Step 6: Save Plan
 

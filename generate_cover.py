@@ -144,6 +144,61 @@ Use a clean, attractive background with vibrant colors."""
     return None
 
 
+def colorize_page(image_path: str) -> Image.Image | None:
+    """Use Gemini to colorize a line art coloring page."""
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        return None
+
+    client = genai.Client(api_key=api_key)
+
+    img = Image.open(image_path).convert("RGB")
+    # Resize for API efficiency
+    img_small = img.resize((512, 664), Image.Resampling.LANCZOS)
+    img_bytes = io.BytesIO()
+    img_small.save(img_bytes, format="PNG")
+    img_bytes.seek(0)
+
+    prompt = """Color this coloring page with beautiful, vibrant colors.
+Fill in all the white areas with appropriate colors while keeping the black outlines visible.
+Use a warm, cozy color palette with soft pastels and warm tones.
+Make it look like a professionally colored coloring book page."""
+
+    try:
+        response = client.models.generate_content(
+            model=config.GEMINI_MODEL,
+            contents=[
+                types.Part.from_bytes(data=img_bytes.read(), mime_type="image/png"),
+                prompt,
+            ],
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE", "TEXT"],
+            ),
+        )
+        for part in response.candidates[0].content.parts:
+            if part.inline_data is not None:
+                return Image.open(io.BytesIO(part.inline_data.data)).convert("RGB")
+    except Exception as e:
+        print(f"  Colorize failed: {e}")
+
+    return None
+
+
+def get_sample_pages(theme: str, count: int = 6) -> list[str]:
+    """Select evenly spaced sample pages from the theme."""
+    image_dir = os.path.join(config.OUTPUT_IMAGES_DIR, theme)
+    pages = sorted([
+        os.path.join(image_dir, f)
+        for f in os.listdir(image_dir)
+        if f.endswith(".png")
+    ])
+    if len(pages) <= count:
+        return pages
+    # Pick evenly spaced pages
+    step = len(pages) / count
+    return [pages[int(i * step)] for i in range(count)]
+
+
 def get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
     """Get a font, falling back to default if custom fonts unavailable."""
     # Try common system fonts on macOS
@@ -195,6 +250,8 @@ def build_cover(
     theme: str,
     author: str = "",
     custom_title: str | None = None,
+    kdp_width: float | None = None,
+    kdp_height: float | None = None,
 ):
     """Build the complete cover image."""
     theme_config = config.THEMES.get(theme)
@@ -204,13 +261,39 @@ def build_cover(
 
     title = custom_title or theme_config["book_title"]
     total_pages = count_pages(theme)
-    dims = calculate_cover_dimensions(total_pages)
+
+    if kdp_width and kdp_height:
+        # Use exact KDP dimensions — back-calculate spine from total width
+        spine_width = kdp_width - (2 * TRIM_WIDTH) - (2 * BLEED_INCHES)
+        bleed_px = round(BLEED_INCHES * config.DPI)
+        trim_w_px = round(TRIM_WIDTH * config.DPI)
+        spine_w_px = round(spine_width * config.DPI)
+        safe_px = round(SAFE_MARGIN * config.DPI)
+        dims = {
+            "total_pages": total_pages,
+            "spine_width_inches": spine_width,
+            "full_width_inches": kdp_width,
+            "full_height_inches": kdp_height,
+            "full_width_px": round(kdp_width * config.DPI),
+            "full_height_px": round(kdp_height * config.DPI),
+            "bleed_px": bleed_px,
+            "trim_w_px": trim_w_px,
+            "spine_w_px": spine_w_px,
+            "safe_px": safe_px,
+            "back_start_x": bleed_px,
+            "spine_start_x": bleed_px + trim_w_px,
+            "front_start_x": bleed_px + trim_w_px + spine_w_px,
+            "can_have_spine_text": total_pages >= 79,
+        }
+        print("(Using exact KDP dimensions)")
+    else:
+        dims = calculate_cover_dimensions(total_pages)
 
     print(f"Theme: {theme_config['name']}")
     print(f"Title: {title}")
     print(f"Pages: {dims['total_pages']}")
     print(f"Spine: {dims['spine_width_inches']:.3f}\"")
-    print(f"Cover: {dims['full_width_inches']:.2f}\" x {dims['full_height_inches']:.2f}\"")
+    print(f"Cover: {dims['full_width_inches']:.3f}\" x {dims['full_height_inches']:.3f}\"")
     print(f"Pixels: {dims['full_width_px']} x {dims['full_height_px']}")
     print()
 
@@ -305,44 +388,138 @@ def build_cover(
             outline_width=4,
         )
 
-    # --- Back cover text ---
+    # --- Back cover: sample pages grid + text ---
     back_center_x = dims["bleed_px"] + dims["trim_w_px"] // 2
-    back_font = get_font(36, bold=False)
-    back_title_font = get_font(48, bold=True)
+    back_font = get_font(32, bold=False)
+    back_title_font = get_font(44, bold=True)
+    safe = dims["safe_px"]
 
     # Back title
-    back_title = f"{config.THEMES[theme]['name']} Coloring Fun!"
+    back_title = f"{config.THEMES[theme]['name']}"
     bbox = draw.textbbox((0, 0), back_title, font=back_title_font)
     bt_w = bbox[2] - bbox[0]
+    title_y = dims["bleed_px"] + safe + 60
     draw.text(
-        (back_center_x - bt_w // 2, dims["bleed_px"] + safe + 100),
+        (back_center_x - bt_w // 2, title_y),
         back_title,
         font=back_title_font,
-        fill="black",
+        fill=(40, 40, 40),
     )
 
-    # Back description
+    # Short description below title
+    desc_font = get_font(28, bold=False)
+
+    # Count actual images
+    image_dir = os.path.join(config.OUTPUT_IMAGES_DIR, theme)
+    num_images = len([f for f in os.listdir(image_dir) if f.endswith(".png")]) if os.path.exists(image_dir) else 0
+
+    # Load plan for description
+    import json
+    plan_path = os.path.join("plans", f"{theme}_plan.json")
+    plan_desc = ""
+    plan_audience = "adults"
+    if os.path.exists(plan_path):
+        with open(plan_path) as f:
+            plan_data = json.load(f)
+            plan_desc = plan_data.get("description", "")
+            plan_audience = plan_data.get("audience", "adults")
+
     back_desc_lines = [
-        f"{config.COLORING_PAGES_PER_BOOK} unique coloring pages",
-        f"Perfect for kids ages {config.TARGET_AGE}",
+        f"{num_images} unique coloring pages",
         "Bold, easy-to-color designs",
         "Single-sided pages to prevent bleed-through",
-        "Hours of creative fun!",
-        "",
-        "Great gift for birthdays,",
-        "holidays, and rainy days!",
+        "Hours of creative relaxation!",
     ]
-    desc_y = dims["bleed_px"] + safe + 250
+    desc_y = title_y + 70
     for line in back_desc_lines:
-        bbox = draw.textbbox((0, 0), line, font=back_font)
+        bbox = draw.textbbox((0, 0), line, font=desc_font)
         line_w = bbox[2] - bbox[0]
         draw.text(
             (back_center_x - line_w // 2, desc_y),
             line,
-            font=back_font,
-            fill=(60, 60, 60),
+            font=desc_font,
+            fill=(80, 80, 80),
         )
-        desc_y += 55
+        desc_y += 42
+
+    # --- Sample pages grid (3 colored + 3 line art) ---
+    sample_paths = get_sample_pages(theme, 6)
+    if sample_paths:
+        print("Generating sample page previews for back cover...")
+        # Colorize first 3, keep last 3 as line art
+        colored_count = min(3, len(sample_paths))
+        sample_images = []
+
+        import time
+        for i, path in enumerate(sample_paths):
+            if i < colored_count:
+                print(f"  Colorizing sample {i + 1}/{colored_count}: {os.path.basename(path)}...")
+                colored = colorize_page(path)
+                if colored:
+                    sample_images.append(("colored", colored))
+                else:
+                    # Fallback: use line art
+                    sample_images.append(("lineart", Image.open(path).convert("RGB")))
+                if i < colored_count - 1:
+                    time.sleep(config.REQUEST_DELAY_SECONDS)
+            else:
+                sample_images.append(("lineart", Image.open(path).convert("RGB")))
+
+        # Layout: 2 rows x 3 cols grid
+        grid_cols = 3
+        grid_rows = 2
+        back_area_w = dims["trim_w_px"] - 2 * safe
+        grid_top = desc_y + 30
+        # Leave space for barcode at bottom
+        barcode_h = int(1.2 * config.DPI)
+        grid_bottom = dims["full_height_px"] - dims["bleed_px"] - safe - barcode_h - 60
+        grid_avail_h = grid_bottom - grid_top
+
+        padding = 30  # Between thumbnails
+        thumb_w = (back_area_w - (grid_cols - 1) * padding) // grid_cols
+        thumb_h = (grid_avail_h - (grid_rows - 1) * padding) // grid_rows
+
+        # Keep aspect ratio (portrait pages are taller than wide)
+        page_ratio = 3300 / 2550  # ~1.294
+        if thumb_h / thumb_w > page_ratio:
+            thumb_h = int(thumb_w * page_ratio)
+        else:
+            thumb_w = int(thumb_h / page_ratio)
+
+        # Recalculate grid dimensions to center
+        grid_w = grid_cols * thumb_w + (grid_cols - 1) * padding
+        grid_h = grid_rows * thumb_h + (grid_rows - 1) * padding
+        grid_x_start = dims["bleed_px"] + (dims["trim_w_px"] - grid_w) // 2
+        grid_y_start = grid_top + (grid_avail_h - grid_h) // 2
+
+        for idx, (img_type, img) in enumerate(sample_images[:grid_cols * grid_rows]):
+            row = idx // grid_cols
+            col = idx % grid_cols
+            x = grid_x_start + col * (thumb_w + padding)
+            y = grid_y_start + row * (thumb_h + padding)
+
+            # Resize to thumbnail
+            thumb = img.resize((thumb_w, thumb_h), Image.Resampling.LANCZOS)
+
+            # Add thin border
+            border = 3
+            bordered = Image.new("RGB", (thumb_w + 2 * border, thumb_h + 2 * border), (180, 180, 180))
+            bordered.paste(thumb, (border, border))
+
+            # Add subtle shadow
+            shadow_offset = 4
+            draw.rectangle(
+                [x + shadow_offset, y + shadow_offset,
+                 x + thumb_w + 2 * border + shadow_offset, y + thumb_h + 2 * border + shadow_offset],
+                fill=(200, 200, 200),
+            )
+
+            cover.paste(bordered, (x, y))
+
+        # Refresh draw after pasting images
+        draw = ImageDraw.Draw(cover)
+
+        print(f"  Placed {len(sample_images)} sample pages on back cover.")
 
     # Barcode placeholder (KDP adds barcode here)
     barcode_w = int(2 * config.DPI)
@@ -362,16 +539,23 @@ def build_cover(
         fill=(180, 180, 180),
     )
 
-    # --- Save ---
+    # --- Save PNG + PDF ---
     os.makedirs(config.COVERS_DIR, exist_ok=True)
-    output_path = os.path.join(config.COVERS_DIR, f"{theme}_cover.png")
-    cover.save(output_path, "PNG", dpi=(config.DPI, config.DPI))
+    png_path = os.path.join(config.COVERS_DIR, f"{theme}_cover.png")
+    pdf_path = os.path.join(config.COVERS_DIR, f"{theme}_cover.pdf")
 
-    print(f"\nCover saved: {output_path}")
+    cover.save(png_path, "PNG", dpi=(config.DPI, config.DPI))
+
+    # Save as PDF (KDP requires PDF for cover upload)
+    cover_cmyk = cover.convert("RGB")
+    cover_cmyk.save(pdf_path, "PDF", resolution=config.DPI)
+
+    print(f"\nCover saved:")
+    print(f"  PNG: {png_path}")
+    print(f"  PDF: {pdf_path} (upload this to KDP)")
     print(f"Size: {cover.size[0]} x {cover.size[1]} px")
-    print(f"Upload this file as your KDP cover image.")
 
-    return output_path
+    return pdf_path
 
 
 def main():
@@ -394,9 +578,21 @@ def main():
         default=None,
         help="Custom book title (default: from config)",
     )
+    parser.add_argument(
+        "--kdp-width",
+        type=float,
+        default=None,
+        help="Exact cover width in inches from KDP (overrides calculated width)",
+    )
+    parser.add_argument(
+        "--kdp-height",
+        type=float,
+        default=None,
+        help="Exact cover height in inches from KDP (overrides calculated height)",
+    )
     args = parser.parse_args()
 
-    build_cover(args.theme, args.author, args.title)
+    build_cover(args.theme, args.author, args.title, args.kdp_width, args.kdp_height)
 
 
 if __name__ == "__main__":

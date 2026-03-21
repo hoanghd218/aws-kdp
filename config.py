@@ -20,7 +20,8 @@ SAFE_HEIGHT_PX = PAGE_HEIGHT_PX - (2 * MARGIN_PX)  # 3150
 
 # --- Gemini API ---
 GEMINI_MODEL = "gemini-3.1-flash-image-preview"  # Nano Banana Pro - fast image generation
-REQUEST_DELAY_SECONDS = 5  # Delay between API calls to avoid rate limits
+REQUEST_DELAY_SECONDS = 3  # Min delay between API calls (20 requests/min)
+MAX_PARALLEL_WORKERS = 5   # Concurrent image generation threads
 MAX_RETRIES = 3
 
 # --- Book Settings ---
@@ -68,6 +69,21 @@ THEMES = {
         "name": "Cosmic Cuties",
         "book_title": "Cosmic Cuties: A Cozy Alien Coloring Book for Adults",
         "prompt_file": "prompts/cute_aliens.txt",
+    },
+    "cozy_cats_daily_life": {
+        "name": "Cozy Cats Coloring Book",
+        "book_title": "Cozy Cats Coloring Book: Cute Cats in Daily Life with Easy and Bold Designs for Relaxation",
+        "prompt_file": "prompts/cozy_cats_daily_life.txt",
+    },
+    "self_care_girl": {
+        "name": "Self-Care Girl Coloring Book",
+        "book_title": "Self-Care Girl Coloring Book: Cute Cozy Daily Routines for Relaxation and Stress Relief",
+        "prompt_file": "prompts/self_care_girl.txt",
+    },
+    "sinh_vat_bien": {
+        "name": "Ocean Friends",
+        "book_title": "Ocean Friends Coloring Book for Kids Ages 6-12",
+        "prompt_file": "prompts/sinh_vat_bien.txt",
     },
 }
 
