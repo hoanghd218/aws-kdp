@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Generate coloring book page images using Gemini API (Nano Banana Pro).
-Each image is a black-and-white line art suitable for kids to color.
+Generate coloring book page images using AI33 API.
+Each image is a black-and-white line art suitable for coloring.
 """
 
 import argparse
@@ -13,23 +13,11 @@ import time
 
 import requests
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 from PIL import Image, ImageEnhance, ImageOps
 
 import config
 
 load_dotenv()
-
-
-def get_client():
-    """Initialize Gemini API client."""
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        print("Error: GOOGLE_API_KEY not found in .env file")
-        print("Copy .env.example to .env and add your API key")
-        sys.exit(1)
-    return genai.Client(api_key=api_key)
 
 
 def load_subjects(theme: str) -> list[str]:
@@ -78,54 +66,7 @@ def load_plan_prompts(plan_path: str) -> tuple[str, list[str], str | None]:
     return theme_key, page_prompts, page_size
 
 
-def generate_coloring_page(client, subject: str, use_raw_prompt: bool = False, aspect_ratio: str = "3:4") -> Image.Image | None:
-    """Generate a single coloring page image using Gemini API (Nano Banana Pro).
-
-    Args:
-        client: Gemini API client.
-        subject: Either a subject description (formatted with BASE_PROMPT) or a full prompt.
-        use_raw_prompt: If True, use subject as the complete prompt without BASE_PROMPT formatting.
-        aspect_ratio: Gemini aspect ratio string (e.g. "3:4", "1:1").
-    """
-    if use_raw_prompt:
-        prompt = subject
-    else:
-        prompt = config.BASE_PROMPT.format(age=config.TARGET_AGE, subject=subject)
-
-    for attempt in range(config.MAX_RETRIES):
-        try:
-            response = client.models.generate_content(
-                model=config.GEMINI_MODEL,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["TEXT", "IMAGE"],
-                    image_config=types.ImageConfig(
-                        aspect_ratio=aspect_ratio,
-                    ),
-                ),
-            )
-
-            # Extract image from response parts
-            for part in response.parts:
-                if part.text is not None:
-                    print(f"  Model note: {part.text[:100]}")
-                elif part.inline_data is not None:
-                    # Convert raw bytes to PIL Image
-                    image_bytes = part.inline_data.data
-                    pil_image = Image.open(io.BytesIO(image_bytes))
-                    return pil_image
-
-            print(f"  Warning: No image in response (attempt {attempt + 1})")
-
-        except Exception as e:
-            print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
-            if attempt < config.MAX_RETRIES - 1:
-                time.sleep(config.REQUEST_DELAY_SECONDS * 2)
-
-    return None
-
-
-def generate_coloring_page_ai33(prompt: str, aspect_ratio: str = "3:4") -> Image.Image | None:
+def generate_coloring_page(prompt: str, aspect_ratio: str = "3:4") -> Image.Image | None:
     """Generate a single coloring page image using AI33 API.
 
     Submits a task, polls for completion, downloads the result image.
@@ -272,12 +213,6 @@ def main():
         help="Start index in subject list (for resuming)",
     )
     parser.add_argument(
-        "--renderer",
-        choices=["gemini", "ai33"],
-        default="gemini",
-        help="Image renderer: 'gemini' (direct Gemini API) or 'ai33' (AI33 proxy API, default: gemini)",
-    )
-    parser.add_argument(
         "--size",
         choices=config.PAGE_SIZES.keys(),
         default=config.DEFAULT_PAGE_SIZE,
@@ -304,11 +239,6 @@ def main():
     else:
         parser.error("--theme is required unless --plan is provided")
 
-    # Initialize client only for gemini renderer
-    client = None
-    if args.renderer == "gemini":
-        client = get_client()
-
     # Limit to requested count
     end_idx = min(args.start + args.count, len(prompts))
     prompts = prompts[args.start : end_idx]
@@ -320,13 +250,13 @@ def main():
     if use_raw_prompt:
         print(f"Plan: {args.plan}")
     dims = config.get_page_dims(args.size)
-    print(f"Renderer: {args.renderer}")
+    print(f"Renderer: AI33")
     print(f"Page size: {config.PAGE_SIZES[args.size]['label']}")
     print(f"Generating {len(prompts)} coloring pages...")
     print(f"Output: {output_dir}/")
     print()
 
-    # --- Generate pages (parallel for ai33, sequential for gemini) ---
+    # --- Generate pages (parallel via AI33 async tasks) ---
     def _generate_one(i_prompt):
         i, prompt_text = i_prompt
         page_num = args.start + i + 1
@@ -340,14 +270,11 @@ def main():
         display_text = prompt_text[:80] + "..." if len(prompt_text) > 80 else prompt_text
         print(f"[{page_num}/{end_idx}] Generating: {display_text}")
 
-        if args.renderer == "ai33":
-            if use_raw_prompt:
-                full_prompt = prompt_text
-            else:
-                full_prompt = config.BASE_PROMPT.format(age=config.TARGET_AGE, subject=prompt_text)
-            image = generate_coloring_page_ai33(full_prompt, aspect_ratio=dims["ai33_aspect_ratio"])
+        if use_raw_prompt:
+            full_prompt = prompt_text
         else:
-            image = generate_coloring_page(client, prompt_text, use_raw_prompt=use_raw_prompt, aspect_ratio=dims["aspect_ratio"])
+            full_prompt = config.BASE_PROMPT.format(age=config.TARGET_AGE, subject=prompt_text)
+        image = generate_coloring_page(full_prompt, aspect_ratio=dims["ai33_aspect_ratio"])
 
         if image:
             processed = post_process(image, size_key=args.size)
@@ -360,8 +287,7 @@ def main():
 
     tasks = list(enumerate(prompts))
 
-    if args.renderer == "ai33" and len(tasks) > 1:
-        # Parallel generation for AI33 (async tasks with polling)
+    if len(tasks) > 1:
         from concurrent.futures import ThreadPoolExecutor
         workers = min(config.MAX_PARALLEL_WORKERS, len(tasks))
         print(f"Running {workers} parallel workers...\n")
@@ -369,13 +295,10 @@ def main():
             results = list(pool.map(_generate_one, tasks))
         success_count = sum(1 for r in results if r)
     else:
-        # Sequential for Gemini (rate-limited)
         success_count = 0
         for task in tasks:
             if _generate_one(task):
                 success_count += 1
-            if task != tasks[-1]:
-                time.sleep(config.REQUEST_DELAY_SECONDS)
 
     print()
     print(f"Done! Generated {success_count}/{len(prompts)} pages")

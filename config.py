@@ -147,6 +147,12 @@ THEMES = {
         "prompt_file": "prompts/cottage_garden.txt",
         "page_size": "8.5x8.5",
     },
+    "cat_lovers_bold_easy": {
+        "name": "Cat Lovers Bold and Easy",
+        "book_title": "Cat Lovers Coloring Book: Bold and Easy Designs for Adults",
+        "prompt_file": "prompts/cat_lovers_bold_easy.txt",
+        "page_size": "8.5x8.5",
+    },
 }
 
 # --- Paths ---

@@ -515,7 +515,6 @@ def build_cover(
     num_images = len([f for f in os.listdir(image_dir) if f.endswith(".png")]) if os.path.exists(image_dir) else 0
 
     # Load plan for description
-    import json
     plan_path = os.path.join("plans", f"{theme}_plan.json")
     plan_desc = ""
     plan_audience = "adults"
