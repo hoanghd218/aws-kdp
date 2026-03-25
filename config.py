@@ -4,12 +4,34 @@ All measurements based on Amazon KDP paperback specifications.
 """
 
 # --- Page Dimensions ---
+# Supported page sizes for KDP
+PAGE_SIZES = {
+    "8.5x11": {
+        "width": 8.5,
+        "height": 11.0,
+        "aspect_ratio": "3:4",       # For Gemini API
+        "ai33_aspect_ratio": "3:4",  # For AI33 API
+        "label": "8.5\" x 11\" (Portrait)",
+    },
+    "8.5x8.5": {
+        "width": 8.5,
+        "height": 8.5,
+        "aspect_ratio": "1:1",       # For Gemini API
+        "ai33_aspect_ratio": "1:1",  # For AI33 API
+        "label": "8.5\" x 8.5\" (Square)",
+    },
+}
+
+# Default page size
+DEFAULT_PAGE_SIZE = "8.5x11"
+
+# Legacy defaults (8.5x11) — used when --size is not specified
 PAGE_WIDTH_INCHES = 8.5
 PAGE_HEIGHT_INCHES = 11.0
 DPI = 300
 MARGIN_INCHES = 0.25
 
-# Derived pixel dimensions
+# Derived pixel dimensions (default 8.5x11)
 PAGE_WIDTH_PX = int(PAGE_WIDTH_INCHES * DPI)   # 2550
 PAGE_HEIGHT_PX = int(PAGE_HEIGHT_INCHES * DPI)  # 3300
 MARGIN_PX = int(MARGIN_INCHES * DPI)            # 75
@@ -18,11 +40,39 @@ MARGIN_PX = int(MARGIN_INCHES * DPI)            # 75
 SAFE_WIDTH_PX = PAGE_WIDTH_PX - (2 * MARGIN_PX)   # 2400
 SAFE_HEIGHT_PX = PAGE_HEIGHT_PX - (2 * MARGIN_PX)  # 3150
 
+
+def get_page_dims(size_key: str = DEFAULT_PAGE_SIZE) -> dict:
+    """Return pixel dimensions for a given page size key."""
+    ps = PAGE_SIZES[size_key]
+    w = int(ps["width"] * DPI)
+    h = int(ps["height"] * DPI)
+    m = int(MARGIN_INCHES * DPI)
+    return {
+        "width_inches": ps["width"],
+        "height_inches": ps["height"],
+        "width_px": w,
+        "height_px": h,
+        "margin_px": m,
+        "safe_width_px": w - 2 * m,
+        "safe_height_px": h - 2 * m,
+        "aspect_ratio": ps["aspect_ratio"],
+        "ai33_aspect_ratio": ps["ai33_aspect_ratio"],
+    }
+
 # --- Gemini API ---
 GEMINI_MODEL = "gemini-3.1-flash-image-preview"  # Nano Banana Pro - fast image generation
 REQUEST_DELAY_SECONDS = 3  # Min delay between API calls (20 requests/min)
 MAX_PARALLEL_WORKERS = 5   # Concurrent image generation threads
 MAX_RETRIES = 3
+
+# --- AI33 API ---
+AI33_API_URL = "https://api.ai33.pro/v1i/task/generate-image"
+AI33_STATUS_URL = "https://api.ai33.pro/v1/task"
+AI33_MODEL_ID = "gemini-3.1-flash-image-preview"
+AI33_RESOLUTION = "2K"
+AI33_ASPECT_RATIO = "3:4"  # Portrait for coloring books
+AI33_POLL_INTERVAL = 5  # Seconds between status polls
+AI33_POLL_TIMEOUT = 300  # Max seconds to wait for image generation
 
 # --- Book Settings ---
 COLORING_PAGES_PER_BOOK = 30
@@ -84,6 +134,18 @@ THEMES = {
         "name": "Ocean Friends",
         "book_title": "Ocean Friends Coloring Book for Kids Ages 6-12",
         "prompt_file": "prompts/sinh_vat_bien.txt",
+    },
+    "cozy_kitchen": {
+        "name": "Cozy Kitchen",
+        "book_title": "Cozy Kitchen — Bold and Easy Coloring Book",
+        "prompt_file": "prompts/cozy_kitchen.txt",
+        "page_size": "8.5x8.5",
+    },
+    "cottage_garden": {
+        "name": "Cottage Garden",
+        "book_title": "Cottage Garden — Bold and Easy Coloring Book",
+        "prompt_file": "prompts/cottage_garden.txt",
+        "page_size": "8.5x8.5",
     },
 }
 

@@ -38,25 +38,35 @@ def get_sorted_images(theme: str) -> list[str]:
     return images
 
 
-def _detect_audience(theme: str) -> str:
-    """Detect audience from plan file or default to kids."""
+def _load_plan_meta(theme: str) -> dict:
+    """Load audience and page_size from plan file."""
     import json
     plan_path = os.path.join("plans", f"{theme}_plan.json")
+    meta = {"audience": "kids", "page_size": None}
     if os.path.exists(plan_path):
         with open(plan_path) as f:
             plan = json.load(f)
-            return plan.get("audience", "kids")
-    return "kids"
+            meta["audience"] = plan.get("audience", "kids")
+            meta["page_size"] = plan.get("page_size")
+    return meta
 
 
-def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None):
+def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None, size: str = config.DEFAULT_PAGE_SIZE):
     """Build KDP-ready PDF coloring book."""
     theme_config = config.THEMES.get(theme)
     if not theme_config:
         print(f"Error: Unknown theme '{theme}'")
         sys.exit(1)
 
-    audience = _detect_audience(theme)
+    # Auto-detect page size from plan/theme config if not explicitly set
+    plan_meta = _load_plan_meta(theme)
+    audience = plan_meta["audience"]
+    if size == config.DEFAULT_PAGE_SIZE:
+        # Check plan first, then theme config
+        if plan_meta["page_size"] and plan_meta["page_size"] in config.PAGE_SIZES:
+            size = plan_meta["page_size"]
+        elif "page_size" in theme_config and theme_config["page_size"] in config.PAGE_SIZES:
+            size = theme_config["page_size"]
 
     if title is None:
         title = theme_config["book_title"]
@@ -74,9 +84,10 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None)
     safe_title = theme.replace(" ", "_")
     output_path = os.path.join(config.OUTPUT_BOOKS_DIR, f"{safe_title}_coloring_book.pdf")
 
-    # Page size: 8.5 x 11 inches
-    page_w = config.PAGE_WIDTH_INCHES * inch
-    page_h = config.PAGE_HEIGHT_INCHES * inch
+    # Page size from --size option
+    dims = config.get_page_dims(size)
+    page_w = dims["width_inches"] * inch
+    page_h = dims["height_inches"] * inch
 
     c = canvas.Canvas(output_path, pagesize=(page_w, page_h))
 
@@ -180,7 +191,7 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None)
     print(f"  - Copyright: 1")
     print(f"  - Coloring pages: {len(images)} (with {len(images)} blank backs)")
     print(f"  - Thank you: 1")
-    print(f"Page size: {config.PAGE_WIDTH_INCHES}\" x {config.PAGE_HEIGHT_INCHES}\"")
+    print(f"Page size: {dims['width_inches']}\" x {dims['height_inches']}\"")
 
 
 def _wrap_text(text: str, max_chars: int = 25) -> list[str]:
@@ -219,9 +230,15 @@ def main():
         default=None,
         help="Custom subtitle",
     )
+    parser.add_argument(
+        "--size",
+        choices=config.PAGE_SIZES.keys(),
+        default=config.DEFAULT_PAGE_SIZE,
+        help=f"Page size (default: {config.DEFAULT_PAGE_SIZE})",
+    )
     args = parser.parse_args()
 
-    build_pdf(args.theme, args.title, args.subtitle)
+    build_pdf(args.theme, args.title, args.subtitle, args.size)
 
 
 if __name__ == "__main__":

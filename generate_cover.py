@@ -6,10 +6,13 @@ Uses Gemini API to generate front cover artwork, then composites with text.
 
 import argparse
 import io
+import json
 import os
 import sys
 import textwrap
+import time
 
+import requests
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -22,24 +25,24 @@ load_dotenv()
 # --- Cover Dimensions ---
 BLEED_INCHES = 0.125
 PAPER_THICKNESS = 0.002252  # White paper, inches per page
-TRIM_WIDTH = config.PAGE_WIDTH_INCHES   # 8.5"
-TRIM_HEIGHT = config.PAGE_HEIGHT_INCHES  # 11"
+TRIM_WIDTH = config.PAGE_WIDTH_INCHES   # default 8.5"
+TRIM_HEIGHT = config.PAGE_HEIGHT_INCHES  # default 11"
 SAFE_MARGIN = 0.375  # Keep important content this far from trim edge
 
 
-def calculate_cover_dimensions(total_pages: int) -> dict:
+def calculate_cover_dimensions(total_pages: int, trim_w: float = TRIM_WIDTH, trim_h: float = TRIM_HEIGHT) -> dict:
     """Calculate full cover dimensions based on page count."""
     spine_width = total_pages * PAPER_THICKNESS
 
-    full_width = (2 * TRIM_WIDTH) + spine_width + (2 * BLEED_INCHES)
-    full_height = TRIM_HEIGHT + (2 * BLEED_INCHES)
+    full_width = (2 * trim_w) + spine_width + (2 * BLEED_INCHES)
+    full_height = trim_h + (2 * BLEED_INCHES)
 
     full_width_px = int(full_width * config.DPI)
     full_height_px = int(full_height * config.DPI)
 
     # Regions in pixels (from left to right)
     bleed_px = int(BLEED_INCHES * config.DPI)
-    trim_w_px = int(TRIM_WIDTH * config.DPI)
+    trim_w_px = int(trim_w * config.DPI)
     spine_w_px = int(spine_width * config.DPI)
     safe_px = int(SAFE_MARGIN * config.DPI)
 
@@ -78,16 +81,87 @@ def count_pages(theme: str) -> int:
     return total
 
 
-def generate_front_artwork(theme: str, title: str = "") -> Image.Image | None:
-    """Generate front cover artwork using Gemini API."""
-    import json
-
-    api_key = os.getenv("GOOGLE_API_KEY")
+def _generate_image_ai33(prompt: str, aspect_ratio: str = "1:1") -> Image.Image | None:
+    """Generate an image using AI33 API."""
+    api_key = os.getenv("AI33_KEY")
     if not api_key:
-        print("Error: GOOGLE_API_KEY not found in .env")
+        print("Error: AI33_KEY not found in .env")
         sys.exit(1)
 
-    client = genai.Client(api_key=api_key)
+    headers = {"xi-api-key": api_key}
+    model_params = json.dumps({
+        "aspect_ratio": aspect_ratio,
+        "resolution": config.AI33_RESOLUTION,
+    })
+
+    for attempt in range(config.MAX_RETRIES):
+        try:
+            resp = requests.post(
+                config.AI33_API_URL,
+                headers=headers,
+                data={
+                    "prompt": prompt,
+                    "model_id": config.AI33_MODEL_ID,
+                    "generations_count": "1",
+                    "model_parameters": model_params,
+                },
+            )
+            resp.raise_for_status()
+            result = resp.json()
+
+            if not result.get("success"):
+                print(f"  AI33 submit failed (attempt {attempt + 1}): {result}")
+                continue
+
+            task_id = result["task_id"]
+            credits_remaining = result.get("ec_remain_credits", "?")
+            print(f"  Task submitted: {task_id} (credits remaining: {credits_remaining})")
+
+            elapsed = 0
+            while elapsed < config.AI33_POLL_TIMEOUT:
+                time.sleep(config.AI33_POLL_INTERVAL)
+                elapsed += config.AI33_POLL_INTERVAL
+
+                status_resp = requests.get(
+                    f"{config.AI33_STATUS_URL}/{task_id}",
+                    headers={"Content-Type": "application/json", "xi-api-key": api_key},
+                )
+                status_resp.raise_for_status()
+                status = status_resp.json()
+
+                if status.get("status") == "done":
+                    images = status.get("metadata", {}).get("result_images", [])
+                    if not images:
+                        print("  Warning: Task done but no images returned")
+                        break
+                    image_url = images[0].get("imageUrl")
+                    if not image_url:
+                        print("  Warning: No imageUrl in result")
+                        break
+                    img_resp = requests.get(image_url)
+                    img_resp.raise_for_status()
+                    return Image.open(io.BytesIO(img_resp.content))
+
+                elif status.get("status") == "error":
+                    print(f"  AI33 error: {status.get('error_message', 'Unknown error')}")
+                    break
+                else:
+                    progress = status.get("progress", 0)
+                    print(f"  Polling... status={status.get('status')} progress={progress}%")
+
+            if elapsed >= config.AI33_POLL_TIMEOUT:
+                print(f"  Timeout waiting for AI33 task {task_id}")
+
+        except Exception as e:
+            print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
+            if attempt < config.MAX_RETRIES - 1:
+                time.sleep(config.REQUEST_DELAY_SECONDS)
+
+    return None
+
+
+def generate_front_artwork(theme: str, title: str = "", renderer: str = "gemini") -> Image.Image | None:
+    """Generate front cover artwork using Gemini or AI33 API."""
     theme_config = config.THEMES[theme]
 
     # Try to load cover_prompt from plan file
@@ -99,9 +173,7 @@ def generate_front_artwork(theme: str, title: str = "") -> Image.Image | None:
             cover_prompt_from_plan = plan.get("cover_prompt")
 
     if cover_prompt_from_plan:
-        # Use plan's cover prompt, but ensure title text is included in artwork
         prompt = cover_prompt_from_plan
-        # Override the "DO NOT include text" instruction — we WANT the title in the artwork
         prompt = prompt.replace("DO NOT include any text, letters, or words in the generated image.", "")
         prompt += f'\n\nIMPORTANT: Include the book title "{title}" as beautiful, large, decorative text integrated into the artwork at the top of the image. The title text should be stylish, readable, and part of the cover design. Do NOT include any placeholder text, subtitle text, or extra text besides the title.'
     else:
@@ -121,7 +193,18 @@ IMPORTANT: Include the book title "{title}" as beautiful, large, decorative text
 The artwork should be high quality, detailed, and appealing.
 Use a clean, attractive background with vibrant colors."""
 
-    print("Generating front cover artwork...")
+    print(f"Generating front cover artwork (renderer: {renderer})...")
+
+    if renderer == "ai33":
+        return _generate_image_ai33(prompt, aspect_ratio="3:4")
+
+    # Gemini renderer
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        print("Error: GOOGLE_API_KEY not found in .env")
+        sys.exit(1)
+
+    client = genai.Client(api_key=api_key)
     for attempt in range(config.MAX_RETRIES):
         try:
             response = client.models.generate_content(
@@ -144,8 +227,13 @@ Use a clean, attractive background with vibrant colors."""
     return None
 
 
-def colorize_page(image_path: str) -> Image.Image | None:
-    """Use Gemini to colorize a line art coloring page."""
+def colorize_page(image_path: str, renderer: str = "gemini") -> Image.Image | None:
+    """Use Gemini to colorize a line art coloring page. AI33 cannot colorize (text-to-image only)."""
+    if renderer == "ai33":
+        # AI33 is text-to-image only, cannot colorize existing images
+        # Return None to fall back to using original line art
+        return None
+
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         return None
@@ -153,16 +241,10 @@ def colorize_page(image_path: str) -> Image.Image | None:
     client = genai.Client(api_key=api_key)
 
     img = Image.open(image_path).convert("RGB")
-    # Resize for API efficiency
     img_small = img.resize((512, 664), Image.Resampling.LANCZOS)
     img_bytes = io.BytesIO()
     img_small.save(img_bytes, format="PNG")
     img_bytes.seek(0)
-
-    prompt = """Color this coloring page with beautiful, vibrant colors.
-Fill in all the white areas with appropriate colors while keeping the black outlines visible.
-Use a warm, cozy color palette with soft pastels and warm tones.
-Make it look like a professionally colored coloring book page."""
 
     try:
         response = client.models.generate_content(
@@ -252,6 +334,8 @@ def build_cover(
     custom_title: str | None = None,
     kdp_width: float | None = None,
     kdp_height: float | None = None,
+    size: str = config.DEFAULT_PAGE_SIZE,
+    renderer: str = "gemini",
 ):
     """Build the complete cover image."""
     theme_config = config.THEMES.get(theme)
@@ -259,14 +343,31 @@ def build_cover(
         print(f"Error: Unknown theme '{theme}'")
         sys.exit(1)
 
+    # Auto-detect page size from plan if not explicitly set
+    plan_path = os.path.join("plans", f"{theme}_plan.json")
+    if size == config.DEFAULT_PAGE_SIZE and os.path.exists(plan_path):
+        with open(plan_path) as f:
+            plan_data_for_size = json.load(f)
+            plan_size = plan_data_for_size.get("page_size")
+            if plan_size and plan_size in config.PAGE_SIZES:
+                size = plan_size
+    # Also check theme config
+    if size == config.DEFAULT_PAGE_SIZE and "page_size" in theme_config and theme_config["page_size"] in config.PAGE_SIZES:
+        size = theme_config["page_size"]
+
+    # Use page size dimensions for trim
+    page_dims = config.get_page_dims(size)
+    trim_w = page_dims["width_inches"]
+    trim_h = page_dims["height_inches"]
+
     title = custom_title or theme_config["book_title"]
     total_pages = count_pages(theme)
 
     if kdp_width and kdp_height:
         # Use exact KDP dimensions — back-calculate spine from total width
-        spine_width = kdp_width - (2 * TRIM_WIDTH) - (2 * BLEED_INCHES)
+        spine_width = kdp_width - (2 * trim_w) - (2 * BLEED_INCHES)
         bleed_px = round(BLEED_INCHES * config.DPI)
-        trim_w_px = round(TRIM_WIDTH * config.DPI)
+        trim_w_px = round(trim_w * config.DPI)
         spine_w_px = round(spine_width * config.DPI)
         safe_px = round(SAFE_MARGIN * config.DPI)
         dims = {
@@ -287,7 +388,7 @@ def build_cover(
         }
         print("(Using exact KDP dimensions)")
     else:
-        dims = calculate_cover_dimensions(total_pages)
+        dims = calculate_cover_dimensions(total_pages, trim_w=trim_w, trim_h=trim_h)
 
     print(f"Theme: {theme_config['name']}")
     print(f"Title: {title}")
@@ -302,7 +403,7 @@ def build_cover(
     draw = ImageDraw.Draw(cover)
 
     # --- Generate and place front cover artwork ---
-    artwork = generate_front_artwork(theme, title)
+    artwork = generate_front_artwork(theme, title, renderer=renderer)
     if artwork:
         # Resize artwork to fit front cover area
         front_w = dims["trim_w_px"]
@@ -454,7 +555,7 @@ def build_cover(
         for i, path in enumerate(sample_paths):
             if i < colored_count:
                 print(f"  Colorizing sample {i + 1}/{colored_count}: {os.path.basename(path)}...")
-                colored = colorize_page(path)
+                colored = colorize_page(path, renderer=renderer)
                 if colored:
                     sample_images.append(("colored", colored))
                 else:
@@ -590,9 +691,21 @@ def main():
         default=None,
         help="Exact cover height in inches from KDP (overrides calculated height)",
     )
+    parser.add_argument(
+        "--size",
+        choices=config.PAGE_SIZES.keys(),
+        default=config.DEFAULT_PAGE_SIZE,
+        help=f"Page size (default: {config.DEFAULT_PAGE_SIZE})",
+    )
+    parser.add_argument(
+        "--renderer",
+        choices=["gemini", "ai33"],
+        default="gemini",
+        help="Image renderer: 'gemini' or 'ai33' (default: gemini)",
+    )
     args = parser.parse_args()
 
-    build_cover(args.theme, args.author, args.title, args.kdp_width, args.kdp_height)
+    build_cover(args.theme, args.author, args.title, args.kdp_width, args.kdp_height, args.size, args.renderer)
 
 
 if __name__ == "__main__":

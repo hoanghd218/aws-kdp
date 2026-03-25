@@ -11,6 +11,7 @@ import os
 import sys
 import time
 
+import requests
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -49,11 +50,11 @@ def load_subjects(theme: str) -> list[str]:
     return subjects
 
 
-def load_plan_prompts(plan_path: str) -> tuple[str, list[str]]:
-    """Load theme key and full prompts from a plan JSON file.
+def load_plan_prompts(plan_path: str) -> tuple[str, list[str], str | None]:
+    """Load theme key, full prompts, and page_size from a plan JSON file.
 
     Returns:
-        (theme_key, list_of_full_prompts)
+        (theme_key, list_of_full_prompts, page_size_or_None)
     """
     if not os.path.exists(plan_path):
         print(f"Error: Plan file not found: {plan_path}")
@@ -72,16 +73,19 @@ def load_plan_prompts(plan_path: str) -> tuple[str, list[str]]:
         print("Error: Plan file has no 'page_prompts'")
         sys.exit(1)
 
-    return theme_key, page_prompts
+    page_size = plan.get("page_size")  # e.g. "8.5x11" or "8.5x8.5"
+
+    return theme_key, page_prompts, page_size
 
 
-def generate_coloring_page(client, subject: str, use_raw_prompt: bool = False) -> Image.Image | None:
+def generate_coloring_page(client, subject: str, use_raw_prompt: bool = False, aspect_ratio: str = "3:4") -> Image.Image | None:
     """Generate a single coloring page image using Gemini API (Nano Banana Pro).
 
     Args:
         client: Gemini API client.
         subject: Either a subject description (formatted with BASE_PROMPT) or a full prompt.
         use_raw_prompt: If True, use subject as the complete prompt without BASE_PROMPT formatting.
+        aspect_ratio: Gemini aspect ratio string (e.g. "3:4", "1:1").
     """
     if use_raw_prompt:
         prompt = subject
@@ -96,7 +100,7 @@ def generate_coloring_page(client, subject: str, use_raw_prompt: bool = False) -
                 config=types.GenerateContentConfig(
                     response_modalities=["TEXT", "IMAGE"],
                     image_config=types.ImageConfig(
-                        aspect_ratio="3:4",
+                        aspect_ratio=aspect_ratio,
                     ),
                 ),
             )
@@ -121,15 +125,107 @@ def generate_coloring_page(client, subject: str, use_raw_prompt: bool = False) -
     return None
 
 
-def post_process(image: Image.Image) -> Image.Image:
+def generate_coloring_page_ai33(prompt: str, aspect_ratio: str = "3:4") -> Image.Image | None:
+    """Generate a single coloring page image using AI33 API.
+
+    Submits a task, polls for completion, downloads the result image.
+    """
+    api_key = os.getenv("AI33_KEY")
+    if not api_key:
+        print("Error: AI33_KEY not found in .env file")
+        sys.exit(1)
+
+    headers = {"xi-api-key": api_key}
+    model_params = json.dumps({
+        "aspect_ratio": aspect_ratio,
+        "resolution": config.AI33_RESOLUTION,
+    })
+
+    for attempt in range(config.MAX_RETRIES):
+        try:
+            # Submit generation task
+            resp = requests.post(
+                config.AI33_API_URL,
+                headers=headers,
+                data={
+                    "prompt": prompt,
+                    "model_id": config.AI33_MODEL_ID,
+                    "generations_count": "1",
+                    "model_parameters": model_params,
+                },
+            )
+            resp.raise_for_status()
+            result = resp.json()
+
+            if not result.get("success"):
+                print(f"  AI33 submit failed (attempt {attempt + 1}): {result}")
+                continue
+
+            task_id = result["task_id"]
+            credits_remaining = result.get("ec_remain_credits", "?")
+            print(f"  Task submitted: {task_id} (credits remaining: {credits_remaining})")
+
+            # Poll for completion
+            elapsed = 0
+            while elapsed < config.AI33_POLL_TIMEOUT:
+                time.sleep(config.AI33_POLL_INTERVAL)
+                elapsed += config.AI33_POLL_INTERVAL
+
+                status_resp = requests.get(
+                    f"{config.AI33_STATUS_URL}/{task_id}",
+                    headers={"Content-Type": "application/json", "xi-api-key": api_key},
+                )
+                status_resp.raise_for_status()
+                status = status_resp.json()
+
+                if status.get("status") == "done":
+                    images = status.get("metadata", {}).get("result_images", [])
+                    if not images:
+                        print(f"  Warning: Task done but no images returned")
+                        break
+
+                    image_url = images[0].get("imageUrl")
+                    if not image_url:
+                        print(f"  Warning: No imageUrl in result")
+                        break
+
+                    # Download the image
+                    img_resp = requests.get(image_url)
+                    img_resp.raise_for_status()
+                    pil_image = Image.open(io.BytesIO(img_resp.content))
+                    return pil_image
+
+                elif status.get("status") == "error":
+                    print(f"  AI33 error: {status.get('error_message', 'Unknown error')}")
+                    break
+
+                else:
+                    progress = status.get("progress", 0)
+                    if elapsed % 15 == 0:  # Log every 15 seconds
+                        print(f"  Polling... status={status.get('status')} progress={progress}%")
+
+            if elapsed >= config.AI33_POLL_TIMEOUT:
+                print(f"  Timeout waiting for AI33 task {task_id}")
+
+        except Exception as e:
+            print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
+            if attempt < config.MAX_RETRIES - 1:
+                time.sleep(config.REQUEST_DELAY_SECONDS * 2)
+
+    return None
+
+
+def post_process(image: Image.Image, size_key: str = config.DEFAULT_PAGE_SIZE) -> Image.Image:
     """Post-process generated image for coloring book quality."""
+    dims = config.get_page_dims(size_key)
+
     # Convert to grayscale
     image = ImageOps.grayscale(image)
 
     # Fit image into safe area while preserving aspect ratio (no distortion)
     image = ImageOps.contain(
         image,
-        (config.SAFE_WIDTH_PX, config.SAFE_HEIGHT_PX),
+        (dims["safe_width_px"], dims["safe_height_px"]),
         Image.Resampling.LANCZOS,
     )
 
@@ -142,9 +238,9 @@ def post_process(image: Image.Image) -> Image.Image:
     image = enhancer.enhance(1.3)
 
     # Create full page with margins (white background), center the image
-    full_page = Image.new("L", (config.PAGE_WIDTH_PX, config.PAGE_HEIGHT_PX), 255)
-    paste_x = (config.PAGE_WIDTH_PX - image.size[0]) // 2
-    paste_y = (config.PAGE_HEIGHT_PX - image.size[1]) // 2
+    full_page = Image.new("L", (dims["width_px"], dims["height_px"]), 255)
+    paste_x = (dims["width_px"] - image.size[0]) // 2
+    paste_y = (dims["height_px"] - image.size[1]) // 2
     full_page.paste(image, (paste_x, paste_y))
 
     return full_page
@@ -175,14 +271,29 @@ def main():
         default=0,
         help="Start index in subject list (for resuming)",
     )
+    parser.add_argument(
+        "--renderer",
+        choices=["gemini", "ai33"],
+        default="gemini",
+        help="Image renderer: 'gemini' (direct Gemini API) or 'ai33' (AI33 proxy API, default: gemini)",
+    )
+    parser.add_argument(
+        "--size",
+        choices=config.PAGE_SIZES.keys(),
+        default=config.DEFAULT_PAGE_SIZE,
+        help=f"Page size (default: {config.DEFAULT_PAGE_SIZE})",
+    )
     args = parser.parse_args()
 
     # Determine mode: plan-based or theme-based
     use_raw_prompt = False
     if args.plan:
-        theme_key, prompts = load_plan_prompts(args.plan)
+        theme_key, prompts, plan_page_size = load_plan_prompts(args.plan)
         use_raw_prompt = True
         theme_name = theme_key
+        # Auto-detect page size from plan if not explicitly set via CLI
+        if plan_page_size and plan_page_size in config.PAGE_SIZES and args.size == config.DEFAULT_PAGE_SIZE:
+            args.size = plan_page_size
         # Use theme config name if available, otherwise use theme_key
         if theme_key in config.THEMES:
             theme_name = config.THEMES[theme_key]["name"]
@@ -193,7 +304,10 @@ def main():
     else:
         parser.error("--theme is required unless --plan is provided")
 
-    client = get_client()
+    # Initialize client only for gemini renderer
+    client = None
+    if args.renderer == "gemini":
+        client = get_client()
 
     # Limit to requested count
     end_idx = min(args.start + args.count, len(prompts))
@@ -205,37 +319,63 @@ def main():
     print(f"Theme: {theme_name}")
     if use_raw_prompt:
         print(f"Plan: {args.plan}")
+    dims = config.get_page_dims(args.size)
+    print(f"Renderer: {args.renderer}")
+    print(f"Page size: {config.PAGE_SIZES[args.size]['label']}")
     print(f"Generating {len(prompts)} coloring pages...")
     print(f"Output: {output_dir}/")
     print()
 
-    success_count = 0
-    for i, prompt_text in enumerate(prompts):
+    # --- Generate pages (parallel for ai33, sequential for gemini) ---
+    def _generate_one(i_prompt):
+        i, prompt_text = i_prompt
         page_num = args.start + i + 1
         filename = f"page_{page_num:02d}.png"
         filepath = os.path.join(output_dir, filename)
 
-        # Skip if already exists
         if os.path.exists(filepath):
             print(f"[{page_num}/{end_idx}] Skipping (exists): {filename}")
-            success_count += 1
-            continue
+            return True
 
         display_text = prompt_text[:80] + "..." if len(prompt_text) > 80 else prompt_text
         print(f"[{page_num}/{end_idx}] Generating: {display_text}")
 
-        image = generate_coloring_page(client, prompt_text, use_raw_prompt=use_raw_prompt)
+        if args.renderer == "ai33":
+            if use_raw_prompt:
+                full_prompt = prompt_text
+            else:
+                full_prompt = config.BASE_PROMPT.format(age=config.TARGET_AGE, subject=prompt_text)
+            image = generate_coloring_page_ai33(full_prompt, aspect_ratio=dims["ai33_aspect_ratio"])
+        else:
+            image = generate_coloring_page(client, prompt_text, use_raw_prompt=use_raw_prompt, aspect_ratio=dims["aspect_ratio"])
+
         if image:
-            processed = post_process(image)
+            processed = post_process(image, size_key=args.size)
             processed.save(filepath, "PNG", dpi=(config.DPI, config.DPI))
             print(f"  Saved: {filename}")
-            success_count += 1
+            return True
         else:
             print(f"  FAILED: Could not generate image")
+            return False
 
-        # Rate limiting
-        if i < len(prompts) - 1:
-            time.sleep(config.REQUEST_DELAY_SECONDS)
+    tasks = list(enumerate(prompts))
+
+    if args.renderer == "ai33" and len(tasks) > 1:
+        # Parallel generation for AI33 (async tasks with polling)
+        from concurrent.futures import ThreadPoolExecutor
+        workers = min(config.MAX_PARALLEL_WORKERS, len(tasks))
+        print(f"Running {workers} parallel workers...\n")
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            results = list(pool.map(_generate_one, tasks))
+        success_count = sum(1 for r in results if r)
+    else:
+        # Sequential for Gemini (rate-limited)
+        success_count = 0
+        for task in tasks:
+            if _generate_one(task):
+                success_count += 1
+            if task != tasks[-1]:
+                time.sleep(config.REQUEST_DELAY_SECONDS)
 
     print()
     print(f"Done! Generated {success_count}/{len(prompts)} pages")

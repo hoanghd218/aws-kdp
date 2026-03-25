@@ -23,8 +23,8 @@ Generates coloring book page images using Gemini API with Nano Banana Pro model.
 
 Check that:
 1. Plan exists: `plans/{theme_key}_plan.json`
-2. `.env` has `GOOGLE_API_KEY`
-3. Dependencies installed: `pip install google-genai Pillow python-dotenv`
+2. `.env` has `GOOGLE_API_KEY` (for Gemini renderer) or `AI33_KEY` (for AI33 renderer)
+3. Dependencies installed: `pip install google-genai Pillow python-dotenv requests`
 
 ```bash
 ls plans/{theme_key}_plan.json
@@ -32,9 +32,15 @@ ls plans/{theme_key}_plan.json
 
 ### Step 2: Run Image Generation
 
-**Plan-based (recommended):**
+**Plan-based with Gemini (default):**
 ```bash
 python generate_images.py --plan plans/{theme_key}_plan.json --count {num_pages}
+```
+The script auto-detects `page_size` from the plan JSON (`"8.5x11"` or `"8.5x8.5"`). For 8.5x8.5, images are generated with 1:1 (square) aspect ratio. You can override with `--size 8.5x8.5`.
+
+**Plan-based with AI33 renderer:**
+```bash
+python generate_images.py --plan plans/{theme_key}_plan.json --count {num_pages} --renderer ai33
 ```
 
 **Theme-based (legacy, for existing themes in config.py):**
@@ -46,6 +52,10 @@ python generate_images.py --theme {theme_key} --count {num_pages}
 ```bash
 python generate_images.py --plan plans/{theme_key}_plan.json --count {num_pages} --start {start_index}
 ```
+
+**Renderer options:**
+- `--renderer gemini` (default) — Direct Gemini API, requires `GOOGLE_API_KEY` in `.env`
+- `--renderer ai33` — AI33 proxy API (uses model `gemini-3.1-flash-image-preview` at 2K resolution), requires `AI33_KEY` in `.env`. Submits async tasks and polls for results.
 
 ### Step 3: Monitor Progress
 
@@ -80,18 +90,24 @@ Check:
 ## Technical Details
 
 - **Model**: `gemini-3.1-flash-image-preview` (Nano Banana Pro)
-- **Aspect ratio**: 3:4 (portrait)
 - **Post-processing**: Grayscale conversion, contrast +2.0, brightness +1.3
-- **Output size**: 2550x3300px (8.5"x11" at 300 DPI)
 - **Margins**: 0.25" (75px) — image centered on full page
 - **Rate limit**: 5 seconds between API calls
+
+**Page sizes (`--size`):**
+| Size | Dimensions | Aspect Ratio | Pixels (300 DPI) |
+|------|-----------|--------------|------------------|
+| `8.5x11` (default) | 8.5" x 11" portrait | 3:4 | 2550 x 3300 |
+| `8.5x8.5` | 8.5" x 8.5" square | 1:1 | 2550 x 2550 |
 
 ---
 
 ## Output
 
 - `output/images/{theme_key}/page_01.png` through `page_XX.png`
-- Each image: 2550x3300px, grayscale, 300 DPI, PNG format
+- Each image: grayscale, 300 DPI, PNG format
+  - 8.5x11: 2550x3300px (portrait)
+  - 8.5x8.5: 2550x2550px (square)
 
 ---
 

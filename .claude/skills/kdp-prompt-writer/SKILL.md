@@ -19,7 +19,11 @@ Claude analyzes the book concept and writes everything: SEO metadata, cover prom
 
 ## Process
 
-### Step 1: Determine Audience & Load Guidelines
+### Step 1: Determine Audience, Page Size & Load Guidelines
+
+Determine the **page_size** (from user or calling command):
+- `"8.5x11"` — Portrait (default). Images are 3:4 aspect ratio.
+- `"8.5x8.5"` — Square. Images are 1:1 aspect ratio. All prompts must describe SQUARE compositions.
 
 Read the appropriate reference guide:
 - **Adults**: Read `references/adult-prompt-guide.md` in this skill directory
@@ -71,16 +75,20 @@ Each prompt describes a complete black-and-white coloring page with:
 - Kawaii character proportions (consistent across pages)
 - Cozy environment props: shelves, lamps, cushions, windows, curtains, tables, art, rugs
 - Mix of solo scenes and occasional secondary character interactions
+- **If page_size is 8.5x8.5**: Add "SQUARE format (1:1 aspect ratio)" to every prompt. Compose scenes that work well in a square frame — balanced, not too tall.
+- **If page_size is 8.5x11**: Add "PORTRAIT orientation (taller than wide)" to every prompt.
 
 **For Kids (Bold & Easy):**
 Each prompt describes a single-subject coloring page with:
-- PORTRAIT orientation, black-and-white line art only
+- Black-and-white line art only
 - Bold, thick, clean outlines for ages 6-12
 - Single subject centered, fills most of page
 - NO shading, gradients, borders, or frames
 - White background
 - Cute, friendly, appealing style
 - Simple enough for crayons/markers
+- **If page_size is 8.5x8.5**: Add "SQUARE format (1:1 aspect ratio)" to every prompt. Subject should fill the square frame evenly.
+- **If page_size is 8.5x11**: Add "PORTRAIT orientation (taller than wide)" to every prompt.
 
 ### Step 5: Ensure Variety
 
@@ -105,6 +113,7 @@ Create the plan JSON file at `plans/{theme_key}_plan.json`:
 {
   "theme_key": "the_theme_key",
   "audience": "adults|kids",
+  "page_size": "8.5x11|8.5x8.5",
   "title": "...",
   "subtitle": "...",
   "description": "...",
@@ -113,6 +122,8 @@ Create the plan JSON file at `plans/{theme_key}_plan.json`:
   "page_prompts": ["prompt1", "prompt2", ...]
 }
 ```
+
+**`page_size`** defaults to `"8.5x11"` if not specified. This field is read by `generate_images.py`, `build_pdf.py`, and `generate_cover.py` to set the correct dimensions and aspect ratio.
 
 Also save `prompts/{theme_key}.txt` (one prompt per line).
 

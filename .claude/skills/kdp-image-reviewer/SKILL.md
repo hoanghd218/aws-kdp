@@ -32,16 +32,34 @@ cat plans/{theme_key}_plan.json | python -c "import json,sys; d=json.load(sys.st
 
 ### Step 2: Inventory & Technical Check
 
-Run a quick technical scan:
+First, detect the expected page size from the plan:
+```bash
+python -c "
+import json, os
+plan = json.load(open('plans/{theme_key}_plan.json')) if os.path.exists('plans/{theme_key}_plan.json') else {}
+size = plan.get('page_size', '8.5x11')
+print(f'Page size: {size}')
+"
+```
+
+Then run a quick technical scan (adjust expected dimensions based on page_size):
 ```bash
 python -c "
 from PIL import Image
-import os, glob
+import os, glob, json
 
 theme = '{theme_key}'
 img_dir = f'output/images/{theme}/'
-issues = []
 
+# Detect expected size from plan
+plan_path = f'plans/{theme}_plan.json'
+expected_w, expected_h = 2550, 3300  # default 8.5x11
+if os.path.exists(plan_path):
+    plan = json.load(open(plan_path))
+    if plan.get('page_size') == '8.5x8.5':
+        expected_w, expected_h = 2550, 2550
+
+issues = []
 for f in sorted(glob.glob(os.path.join(img_dir, '*.png'))):
     img = Image.open(f)
     name = os.path.basename(f)
@@ -49,8 +67,8 @@ for f in sorted(glob.glob(os.path.join(img_dir, '*.png'))):
     mode = img.mode
     fsize = os.path.getsize(f) / 1024
 
-    if w != 2550 or h != 3300:
-        issues.append(f'{name}: Wrong size {w}x{h} (expected 2550x3300)')
+    if w != expected_w or h != expected_h:
+        issues.append(f'{name}: Wrong size {w}x{h} (expected {expected_w}x{expected_h})')
     if mode not in ('L', 'LA'):
         issues.append(f'{name}: Not grayscale (mode={mode})')
     if fsize < 50:
@@ -59,6 +77,7 @@ for f in sorted(glob.glob(os.path.join(img_dir, '*.png'))):
     print(f'{name}: {w}x{h} {mode} {fsize:.0f}KB')
 
 print()
+print(f'Expected: {expected_w}x{expected_h}')
 if issues:
     print('ISSUES FOUND:')
     for i in issues:

@@ -53,7 +53,7 @@ python build_pdf.py --theme {theme_key} --title "Book Title" --subtitle "Subtitl
 4. Thank you page — "Thank You!" + review request
 5. Extra blank page if needed (KDP requires even page count)
 
-**Specs:** 8.5" x 11", no bleed, single-sided coloring pages.
+**Specs:** Page size auto-detected from plan JSON (`page_size` field) or theme config. Supported: 8.5"x11" (portrait) or 8.5"x8.5" (square). No bleed, single-sided coloring pages.
 
 ### Step 3: Verify PDF
 
@@ -134,7 +134,7 @@ NEXT STEPS FOR KDP UPLOAD:
 
 ### PDF
 - [ ] Even page count
-- [ ] 8.5" x 11" pages
+- [ ] Correct page size (8.5"x11" or 8.5"x8.5" per plan)
 - [ ] Title page displays correctly
 - [ ] All coloring pages present with blank backs
 - [ ] Copyright page included
