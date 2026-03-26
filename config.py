@@ -236,6 +236,12 @@ THEMES = {
         "prompt_file": "output/succulents_cacti/prompts.txt",
         "page_size": "8.5x8.5",
     },
+    "vintage_travel_destinations": {
+        "name": "Vintage Travel Destinations",
+        "book_title": "Vintage Wanderlust: Coloring Book for Adults, Bold and Easy",
+        "prompt_file": "output/vintage_travel_destinations/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
 }
 
 # --- Paths ---
