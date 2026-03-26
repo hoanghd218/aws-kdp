@@ -13,12 +13,13 @@ You are the **main orchestrator** for creating KDP coloring books. You manage th
 ```
 YOU (orchestrator)
   ├── Phase 1: Interview (you do this directly)
-  ├── Phase 2: SUB-AGENT → Planning & Prompts
-  ├── Phase 3: Review plan with user (you do this directly)
-  ├── Phase 4: SUB-AGENT → Image Generation
-  ├── Phase 5: SUB-AGENT → Image Review & Auto-Regeneration
-  ├── Phase 6: SUB-AGENT → Book Assembly (PDF + Cover)
-  └── Phase 7: Deliver (you do this directly)
+  ├── Phase 2: SUB-AGENT → Page Prompts & Cover Prompt
+  ├── Phase 3: SKILL → kdp-book-detail (SEO-optimized book metadata)
+  ├── Phase 4: Review plan with user (you do this directly)
+  ├── Phase 5: SUB-AGENT → Image Generation
+  ├── Phase 6: SUB-AGENT → Image Review & Auto-Regeneration
+  ├── Phase 7: SUB-AGENT → Book Assembly (PDF + Cover)
+  └── Phase 8: Deliver (you do this directly)
 ```
 
 ---
@@ -32,18 +33,20 @@ Use AskUserQuestion to gather:
 3. **Book size**: 8.5x11 (portrait, default) or 8.5x8.5 (square)?
 4. **Pages**: How many coloring pages? (recommend 25-30)
 5. **Theme key**: Suggest a snake_case name (e.g., `cozy_cat_cafe`)
-6. **Author name**: For the cover
+6. **Author name**: For the cover (first name + last name)
 
 If arguments were passed, use them as the concept and ask remaining questions.
 
 ---
 
-## Phase 2: Spawn Planning Sub-Agent
+## Phase 2: Spawn Prompt Writing Sub-Agent
+
+This sub-agent writes ONLY the page prompts and cover prompt. SEO metadata is handled by the kdp-book-detail skill in Phase 3.
 
 Spawn a `general-purpose` sub-agent with this prompt:
 
 ```
-You are creating the plan and prompts for a KDP coloring book. Write everything yourself — do NOT call any external AI API for planning.
+You are writing page prompts and cover prompt for a KDP coloring book. Write everything yourself — do NOT call any external AI API.
 
 **Book Details:**
 - Concept: {concept}
@@ -58,17 +61,11 @@ You are creating the plan and prompts for a KDP coloring book. Write everything 
    - Adults: .claude/skills/kdp-prompt-writer/references/adult-prompt-guide.md
    - Kids: .claude/skills/kdp-prompt-writer/references/kids-prompt-guide.md
 
-2. Write SEO metadata:
-   - Title: catchy, keyword-rich, includes audience indicator
-   - Subtitle: descriptive, complementary
-   - Description: 3-5 sentences for Amazon listing
-   - Keywords: 7 SEO-relevant keywords
-
-3. Write cover prompt:
+2. Write cover prompt:
    - Adults: full-color, warm cozy aesthetic, DO NOT include text in image
    - Kids: full-color, vibrant cartoon, DO NOT include text in image
 
-4. Write {page_count} page prompts following these rules:
+3. Write {page_count} page prompts following these rules:
 
    **For Adults:**
    - Start each prompt with: "Black and white line art illustration for an adult coloring book, cute cozy cottagecore aesthetic, medium detail, bold clean outlines, large open shapes for easy coloring, no shading. NO borders, NO frames, NO rectangular boundary lines around the image. White background. {SIZE_TAG}."
@@ -86,45 +83,95 @@ You are creating the plan and prompts for a KDP coloring book. Write everything 
    - Simple enough for crayons/markers
    - Add SIZE_TAG to every prompt
 
-5. Ensure variety: different settings, activities, moods, poses
+4. Ensure variety: different settings, activities, moods, poses
 
-6. Save plan JSON to plans/{theme_key}_plan.json:
+5. Save a DRAFT plan JSON to output/{theme_key}/plan.json with these fields:
    {
      "theme_key": "{theme_key}",
+     "concept": "{concept}",
      "audience": "{audience}",
      "page_size": "{page_size}",
-     "title": "...",
-     "subtitle": "...",
-     "description": "...",
-     "keywords": [...],
+     "title": "",
+     "subtitle": "",
+     "description": "",
+     "keywords": [],
      "cover_prompt": "...",
      "page_prompts": [...]
    }
+   Leave title, subtitle, description, keywords EMPTY — they will be filled by the kdp-book-detail skill.
 
-7. Save prompts to prompts/{theme_key}.txt (one per line)
+6. Save prompts to output/{theme_key}/prompts.txt (one per line)
 
-8. Register theme in config.py THEMES dict
+7. Register theme in config.py THEMES dict
 
-Return the title, subtitle, and 3 sample prompts when done.
+Return the cover prompt and 3 sample page prompts when done.
 ```
 
 **Wait for sub-agent to finish.** Then read the plan JSON yourself.
 
 ---
 
-## Phase 3: Review Plan with User
+## Phase 3: Spawn SEO Book Detail Sub-Agent
 
-Read `plans/{theme_key}_plan.json` and present:
-- Title & subtitle
-- Description
-- Keywords
+Spawn a `general-purpose` sub-agent to generate SEO-optimized book metadata using the `kdp-book-detail` skill, then update the plan JSON.
+
+```
+You are generating SEO-optimized book listing details for a KDP coloring book and updating the plan file.
+
+**Book Details:**
+- Theme key: {theme_key}
+- Concept: {concept}
+- Audience: {audience}
+- Author first name: {author_first_name}
+- Author last name: {author_last_name}
+- Plan file: output/{theme_key}/plan.json
+
+**Your Tasks:**
+
+1. Invoke the `kdp-book-detail` skill using the Skill tool:
+   - skill: "kdp-book-detail"
+   - args: "Plan: output/{theme_key}/plan.json, Author: {author_first_name} {author_last_name}, Audience: {audience}"
+
+   The skill will generate SEO-optimized:
+   - Title (best-seller formula from Amazon analysis)
+   - Subtitle (keyword expansion zone)
+   - Description (HTML, conversion-optimized)
+   - 7 Backend Keywords (no repeats from title/subtitle)
+   - Categories (2 BISAC)
+   - Reading Age
+
+2. After the skill outputs the details, read output/{theme_key}/plan.json and update it with ALL the generated metadata:
+   - Set "title" from the skill's Title output
+   - Set "subtitle" from the skill's Subtitle output
+   - Set "description" from the skill's Description output
+   - Set "keywords" array from the skill's 7 Keywords
+   - Add "categories" array from the skill's Categories
+   - Add "reading_age" from the skill's Reading Age
+   - Add "author" object: {"first_name": "{author_first_name}", "last_name": "{author_last_name}"}
+
+3. Verify the updated plan JSON is valid JSON and contains all fields.
+
+Return the final Title, Subtitle, 7 Keywords, and Categories when done.
+```
+
+**Wait for sub-agent to finish.** Then read the updated plan JSON yourself.
+
+---
+
+## Phase 4: Review Plan with User
+
+Read `output/{theme_key}/plan.json` and present:
+- Title & subtitle (SEO-optimized by kdp-book-detail skill)
+- Description (HTML)
+- Keywords (7 backend keywords)
+- Categories
 - 3-5 sample page prompts
 
 Ask user to approve or request changes. If changes needed, edit the plan directly.
 
 ---
 
-## Phase 4: Spawn Image Generation Sub-Agent
+## Phase 5: Spawn Image Generation Sub-Agent
 
 Spawn a `general-purpose` sub-agent:
 
@@ -132,7 +179,7 @@ Spawn a `general-purpose` sub-agent:
 Generate coloring book images for theme "{theme_key}".
 
 Run this command:
-python generate_images.py --plan plans/{theme_key}_plan.json --count {page_count}
+python generate_images.py --plan output/{theme_key}/plan.json --count {page_count}
 
 Monitor the output. The script auto-handles:
 - Page size detection from plan JSON
@@ -141,7 +188,7 @@ Monitor the output. The script auto-handles:
 - 5-second delay between requests
 
 After completion, verify:
-1. Run: ls -la output/images/{theme_key}/
+1. Run: ls -la output/{theme_key}/images/
 2. Check all page_XX.png files exist (page_01 through page_{page_count:02d})
 3. Check no zero-byte files
 4. Report: X of Y pages generated successfully, any failures
@@ -153,7 +200,7 @@ If pages failed after retries, report which page numbers failed.
 
 ---
 
-## Phase 5: Spawn Image Review Sub-Agent
+## Phase 6: Spawn Image Review Sub-Agent
 
 Spawn a `general-purpose` sub-agent:
 
@@ -163,13 +210,13 @@ You are reviewing coloring book images for KDP quality and auto-regenerating bad
 **Book info:**
 - Theme: {theme_key}
 - Audience: {audience}
-- Plan: plans/{theme_key}_plan.json
-- Images: output/images/{theme_key}/
+- Plan: output/{theme_key}/plan.json
+- Images: output/{theme_key}/images/
 - Total pages: {page_count}
 
 **Step 1: Review every image**
 
-Read each image file output/images/{theme_key}/page_XX.png using the Read tool. Review in batches of 5 (parallel Read calls).
+Read each image file output/{theme_key}/images/page_XX.png using the Read tool. Review in batches of 5 (parallel Read calls).
 
 For each image, evaluate:
 
@@ -197,8 +244,8 @@ Score each page: PASS, WARN, or REDO (with reason).
 
 For each REDO page (page_XX where XX is the page number):
 1. Calculate the 0-based start index: start_index = XX - 1
-2. Delete the bad image: rm output/images/{theme_key}/page_XX.png
-3. Regenerate: python generate_images.py --plan plans/{theme_key}_plan.json --start {start_index} --count 1
+2. Delete the bad image: rm output/{theme_key}/images/page_XX.png
+3. Regenerate: python generate_images.py --plan output/{theme_key}/plan.json --start {start_index} --count 1
 4. Read the new image and review it again
 5. If still REDO, try ONE more time (max 2 regeneration attempts per page)
 6. If still bad after 2 attempts, mark as WARN and move on
@@ -219,7 +266,7 @@ List any unresolved pages so the orchestrator can inform the user.
 
 ---
 
-## Phase 6: Spawn Book Assembly Sub-Agent
+## Phase 7: Spawn Book Assembly Sub-Agent
 
 Spawn a `general-purpose` sub-agent:
 
@@ -229,25 +276,34 @@ Assemble the KDP coloring book for theme "{theme_key}".
 **Book info:**
 - Theme: {theme_key}
 - Author: {author_name}
-- Plan: plans/{theme_key}_plan.json
+- Page size: {page_size}
+- Plan: output/{theme_key}/plan.json
 
 **Tasks:**
 
 1. Verify theme is registered in config.py. If not, read config.py and add it to the THEMES dict.
 
-2. Build interior PDF:
-   python build_pdf.py --theme {theme_key}
+2. Build interior PDF (MUST pass --author for KDP metadata consistency):
+   python build_pdf.py --theme {theme_key} --author "{author_name}"
 
 3. Verify PDF:
-   - File exists: output/books/{theme_key}_coloring_book.pdf
+   - File exists: output/{theme_key}/interior.pdf
    - Check file size is reasonable (> 1MB)
+   - Author name appears on title page and copyright page
 
-4. Generate cover:
-   python generate_cover.py --theme {theme_key} --author "{author_name}"
+4. Generate cover using the `kdp-cover-creator` skill:
+   Invoke Skill tool: skill="kdp-cover-creator", args="--theme {theme_key} --author \"{author_name}\" --size {page_size} --renderer ai33"
+
+   This runs: python generate_cover.py --theme {theme_key} --author "{author_name}" --size {page_size} --renderer ai33
+
+   IMPORTANT: The skill ensures correct aspect ratios:
+   - 8.5x11 books: front artwork 3:4, back thumbnails 3:4
+   - 8.5x8.5 books: front artwork 1:1, back thumbnails 1:1
 
 5. Verify cover:
-   - File exists: covers/{theme_key}_cover.png
+   - File exists: output/{theme_key}/cover.png and output/{theme_key}/cover.pdf
    - Check file size is reasonable (> 500KB)
+   - For 8.5x8.5 books: confirm cover height is ~8.75" (not 11.25")
 
 Report the file paths and sizes when done.
 ```
@@ -256,26 +312,59 @@ Report the file paths and sizes when done.
 
 ---
 
-## Phase 7: Deliver
+## Phase 7.5: KDP Pre-flight Check (you do this directly)
+
+Before delivering, verify KDP compliance:
+
+1. **Metadata consistency** — Read plan.json, then verify:
+   - Title on interior title page matches cover title
+   - Author name appears on: title page, copyright page, and cover
+   - Copyright year is current year (not hardcoded)
+
+2. **Interior PDF checks**:
+   - Even page count
+   - No more than 4 consecutive blank pages in body
+   - No more than 10 blank pages at end
+   - Page size matches plan (8.5x11 or 8.5x8.5)
+
+3. **Cover checks**:
+   - No template/placeholder text (e.g., "BARCODE AREA") visible
+   - Spine text only if 79+ pages
+   - Barcode area is clean white rectangle
+   - 300 DPI resolution
+
+4. **Content checks**:
+   - No binding terminology in title/description ("spiral bound", "leather bound", "hard bound", "calendar")
+   - No promotional claims ("best seller", "#1", "guaranteed")
+
+If any check fails, fix it before delivering.
+
+---
+
+## Phase 8: Deliver
 
 Present final deliverables to the user:
 
 ```
 BOOK COMPLETE!
 
-Interior PDF: output/books/{theme_key}_coloring_book.pdf
-Cover: covers/{theme_key}_cover.png
-Plan: plans/{theme_key}_plan.json
+Interior PDF: output/{theme_key}/interior.pdf
+Cover: output/{theme_key}/cover.png + cover.pdf
+Plan: output/{theme_key}/plan.json
   - Title: {title}
   - Keywords: {keywords}
+
+KDP PRE-FLIGHT: All checks passed
 
 NEXT STEPS FOR KDP UPLOAD:
 1. Go to kdp.amazon.com
 2. Create new Paperback
 3. Upload interior PDF
-4. Upload cover image
+4. Upload cover PDF (not PNG)
 5. Set trim size (no bleed)
 6. Use title, description, and keywords from the plan
+
+NOTE: KDP limits authors to 10 titles per book format per week.
 ```
 
 ---

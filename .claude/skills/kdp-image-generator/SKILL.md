@@ -22,19 +22,19 @@ Generates coloring book page images using AI33 API. This is the ONLY step that c
 ### Step 1: Verify Prerequisites
 
 Check that:
-1. Plan exists: `plans/{theme_key}_plan.json`
+1. Plan exists: `output/{theme_key}/plan.json`
 2. `.env` has `AI33_KEY`
 3. Dependencies installed: `pip install Pillow python-dotenv requests`
 
 ```bash
-ls plans/{theme_key}_plan.json
+ls output/{theme_key}/plan.json
 ```
 
 ### Step 2: Run Image Generation
 
 **Plan-based (recommended):**
 ```bash
-python generate_images.py --plan plans/{theme_key}_plan.json --count {num_pages}
+python generate_images.py --plan output/{theme_key}/plan.json --count {num_pages}
 ```
 The script auto-detects `page_size` from the plan JSON (`"8.5x11"` or `"8.5x8.5"`). For 8.5x8.5, images are generated with 1:1 (square) aspect ratio. You can override with `--size 8.5x8.5`.
 
@@ -45,7 +45,7 @@ python generate_images.py --theme {theme_key} --count {num_pages}
 
 **Resume from a specific page:**
 ```bash
-python generate_images.py --plan plans/{theme_key}_plan.json --count {num_pages} --start {start_index}
+python generate_images.py --plan output/{theme_key}/plan.json --count {num_pages} --start {start_index}
 ```
 
 ### Step 3: Monitor Progress
@@ -68,7 +68,7 @@ If pages fail:
 ### Step 5: Verify Output
 
 ```bash
-ls -la output/images/{theme_key}/
+ls -la output/{theme_key}/images/
 ```
 
 Check:
@@ -96,7 +96,7 @@ Check:
 
 ## Output
 
-- `output/images/{theme_key}/page_01.png` through `page_XX.png`
+- `output/{theme_key}/images/page_01.png` through `page_XX.png`
 - Each image: grayscale, 300 DPI, PNG format
   - 8.5x11: 2550x3300px (portrait)
   - 8.5x8.5: 2550x2550px (square)

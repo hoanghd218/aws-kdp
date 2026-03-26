@@ -45,7 +45,9 @@
       "Bash(cp output/books/self_care_girl_coloring_book.pdf delivery/self_care_girl/)",
       "Bash(cp covers/self_care_girl_cover.png delivery/self_care_girl/)",
       "Bash(cp plans/self_care_girl_plan.json delivery/self_care_girl/)",
-      "Bash(cp output/images/self_care_girl/*.png delivery/self_care_girl/)"
+      "Bash(cp output/images/self_care_girl/*.png delivery/self_care_girl/)",
+      "Bash(chmod:*)",
+      "mcp__plugin_telegram_telegram__reply"
     ],
     "deny": [],
     "ask": []

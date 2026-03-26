@@ -22,9 +22,9 @@ Assembles all approved coloring pages into a KDP-compliant PDF interior and gene
 ### Step 1: Verify Prerequisites
 
 Check that:
-1. Images exist: `output/images/{theme_key}/`
+1. Images exist: `output/{theme_key}/images/`
 2. Theme is registered in `config.py`
-3. Plan exists: `plans/{theme_key}_plan.json` (for title/subtitle)
+3. Plan exists: `output/{theme_key}/plan.json` (for title/subtitle)
 
 If theme not in config.py, register it:
 ```python
@@ -38,13 +38,15 @@ If theme not in config.py, register it:
 ### Step 2: Build Interior PDF
 
 ```bash
-python build_pdf.py --theme {theme_key}
+python build_pdf.py --theme {theme_key} --author "Author Name"
 ```
 
 With custom title/subtitle (from plan):
 ```bash
-python build_pdf.py --theme {theme_key} --title "Book Title" --subtitle "Subtitle Text"
+python build_pdf.py --theme {theme_key} --title "Book Title" --subtitle "Subtitle Text" --author "Author Name"
 ```
+
+**IMPORTANT — KDP Metadata Consistency**: Always pass `--author` so the author name appears on the title page and copyright page. KDP manual review checks that title and author match across title page, copyright page, cover, and spine. Mismatches cause rejection.
 
 **PDF Structure:**
 1. Title page — centered title + subtitle + "Bold & Easy Designs"
@@ -55,13 +57,16 @@ python build_pdf.py --theme {theme_key} --title "Book Title" --subtitle "Subtitl
 
 **Specs:** Page size auto-detected from plan JSON (`page_size` field) or theme config. Supported: 8.5"x11" (portrait) or 8.5"x8.5" (square). No bleed, single-sided coloring pages.
 
-### Step 3: Verify PDF
+### Step 3: Verify PDF (KDP Pre-flight)
 
 Check the output:
-- File exists: `output/books/{theme_key}_coloring_book.pdf`
+- File exists: `output/{theme_key}/interior.pdf`
 - Total page count is even
-- Page size is 8.5" x 11"
+- Page size matches plan (8.5"x11" or 8.5"x8.5")
 - All coloring pages are present
+- **No more than 4 consecutive blank pages** in body (KDP limit)
+- **No more than 10 blank pages** at end (KDP limit)
+- **Metadata consistency**: title on title page matches cover title, author on title page matches cover author
 
 ### Step 4: Generate Cover
 
@@ -87,7 +92,7 @@ python generate_cover.py --theme {theme_key} --author "Author Name" --title "Cus
 ### Step 5: Verify Cover
 
 Check:
-- File exists: `covers/{theme_key}_cover.png`
+- File exists: `output/{theme_key}/cover.png`
 - Front artwork matches theme
 - Title/subtitle text is readable
 - Author name displays correctly
@@ -99,16 +104,16 @@ Report to user:
 ```
 BOOK COMPLETE!
 
-Interior PDF: output/books/{theme_key}_coloring_book.pdf
+Interior PDF: output/{theme_key}/interior.pdf
   - Pages: {total} (even count)
   - Size: 8.5" x 11"
   - Coloring pages: {num_images} (single-sided with blank backs)
 
-Cover: covers/{theme_key}_cover.png
+Cover: output/{theme_key}/cover.png
   - Dimensions: {width}px x {height}px
   - Spine: {spine_width}"
 
-Plan: plans/{theme_key}_plan.json
+Plan: output/{theme_key}/plan.json
   - Title: {title}
   - Keywords: {keywords}
 
@@ -125,8 +130,8 @@ NEXT STEPS FOR KDP UPLOAD:
 
 ## Output
 
-- `output/books/{theme_key}_coloring_book.pdf` — KDP-ready interior
-- `covers/{theme_key}_cover.png` — Full cover at 300 DPI
+- `output/{theme_key}/interior.pdf` — KDP-ready interior
+- `output/{theme_key}/cover.png` — Full cover at 300 DPI
 
 ---
 

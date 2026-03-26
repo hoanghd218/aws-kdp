@@ -27,7 +27,7 @@ Ask the user or detect from context:
 
 Check the plan file if available:
 ```bash
-cat plans/{theme_key}_plan.json | python -c "import json,sys; d=json.load(sys.stdin); print(d.get('audience','unknown'))"
+cat output/{theme_key}/plan.json | python -c "import json,sys; d=json.load(sys.stdin); print(d.get('audience','unknown'))"
 ```
 
 ### Step 2: Inventory & Technical Check
@@ -36,7 +36,7 @@ First, detect the expected page size from the plan:
 ```bash
 python -c "
 import json, os
-plan = json.load(open('plans/{theme_key}_plan.json')) if os.path.exists('plans/{theme_key}_plan.json') else {}
+plan = json.load(open('output/{theme_key}/plan.json')) if os.path.exists('output/{theme_key}/plan.json') else {}
 size = plan.get('page_size', '8.5x11')
 print(f'Page size: {size}')
 "
@@ -49,7 +49,7 @@ from PIL import Image
 import os, glob, json
 
 theme = '{theme_key}'
-img_dir = f'output/images/{theme}/'
+img_dir = f'output/{theme}/images/'
 
 # Detect expected size from plan
 plan_path = f'plans/{theme}_plan.json'
@@ -91,7 +91,7 @@ else:
 
 **Use the Read tool to open and visually inspect EVERY image file.** Claude can see PNG images directly.
 
-For each image at `output/images/{theme_key}/page_XX.png`:
+For each image at `output/{theme_key}/images/page_XX.png`:
 
 1. **Read the image** using the Read tool
 2. **Evaluate** against the criteria below based on audience type
@@ -128,6 +128,11 @@ For each image at `output/images/{theme_key}/page_XX.png`:
 
 **IMPORTANT**: Single-character prompts are safest. If a prompt mentions mirrors, vanity tables, or reflective surfaces, the AI will often render a full reflection that looks like a second person. When reviewing, always count the number of visible human figures (including reflections). When fixing prompts, add "NO mirrors, NO reflections" and change the scene to avoid reflective surfaces.
 
+#### KDP Technical Compliance (CRITICAL):
+- **Line thickness**: Lines must be at minimum 0.75pt (0.01" / 0.3mm). Lines thinner than this may not print correctly. If lines appear hairline-thin, mark as REDO.
+- **Gray fill minimum**: Any gray-filled areas must be at least 10% fill. Very light gray (<10%) won't reproduce in print. If image has barely-visible gray shading, mark as WARN.
+- **No color remnants**: Must be pure grayscale. Any RGB color traces = REDO.
+
 #### Other Common Issues to Flag:
 - Text or letters appearing in the image
 - Color or gray shading (should be pure line art)
@@ -161,14 +166,14 @@ For pages marked REDO, ask the user if they want to regenerate. For each:
 
 1. Delete the bad image:
 ```bash
-rm output/images/{theme_key}/page_XX.png
+rm output/{theme_key}/images/page_XX.png
 ```
 
-2. Optionally adjust the prompt in `plans/{theme_key}_plan.json`
+2. Optionally adjust the prompt in `output/{theme_key}/plan.json`
 
 3. Regenerate (0-indexed start):
 ```bash
-python generate_images.py --plan plans/{theme_key}_plan.json --start {XX-1} --count 1
+python generate_images.py --plan output/{theme_key}/plan.json --start {XX-1} --count 1
 ```
 
 4. **Re-review the regenerated page** by reading it again with the Read tool

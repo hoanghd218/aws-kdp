@@ -68,6 +68,7 @@ Generate based on the concept:
 **For Adults (Cozy & Cute):**
 Each prompt describes a complete black-and-white coloring page with:
 - "Cute cozy medium-detail" adult aesthetic
+- **KDP line thickness**: All outlines must be bold enough to meet KDP's minimum 0.75pt (0.01") line weight. Add "bold thick outlines suitable for coloring" to every prompt.
 - Complete layered scene: foreground + midground + background
 - Large, clear decorative shapes — NO dense micro-patterns
 - Simplified vegetation (large stylized shapes, wide spacing, no micro-veins)
@@ -81,7 +82,7 @@ Each prompt describes a complete black-and-white coloring page with:
 **For Kids (Bold & Easy):**
 Each prompt describes a single-subject coloring page with:
 - Black-and-white line art only
-- Bold, thick, clean outlines for ages 6-12
+- Bold, thick, clean outlines for ages 6-12 (must meet KDP minimum 0.75pt / 0.01" line weight)
 - Single subject centered, fills most of page
 - NO shading, gradients, borders, or frames
 - White background
@@ -108,7 +109,7 @@ Page prompts must cover diverse scenes/activities:
 
 ### Step 6: Save Plan
 
-Create the plan JSON file at `plans/{theme_key}_plan.json`:
+Create the plan JSON file at `output/{theme_key}/plan.json`:
 ```json
 {
   "theme_key": "the_theme_key",
@@ -125,7 +126,7 @@ Create the plan JSON file at `plans/{theme_key}_plan.json`:
 
 **`page_size`** defaults to `"8.5x11"` if not specified. This field is read by `generate_images.py`, `build_pdf.py`, and `generate_cover.py` to set the correct dimensions and aspect ratio.
 
-Also save `prompts/{theme_key}.txt` (one prompt per line).
+Also save `output/{theme_key}/prompts.txt` (one prompt per line).
 
 ### Step 7: Register Theme
 
@@ -134,7 +135,7 @@ Add to `config.py` THEMES dict:
 "{theme_key}": {
     "name": "{Title}",
     "book_title": "{Full Title}",
-    "prompt_file": "prompts/{theme_key}.txt",
+    "prompt_file": "output/{theme_key}/prompts.txt",
 },
 ```
 
@@ -142,8 +143,8 @@ Add to `config.py` THEMES dict:
 
 ## Output
 
-- `plans/{theme_key}_plan.json` — Full plan with metadata + all prompts
-- `prompts/{theme_key}.txt` — One prompt per line
+- `output/{theme_key}/plan.json` — Full plan with metadata + all prompts
+- `output/{theme_key}/prompts.txt` — One prompt per line
 
 ---
 

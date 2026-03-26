@@ -243,7 +243,7 @@ def main():
     end_idx = min(args.start + args.count, len(prompts))
     prompts = prompts[args.start : end_idx]
 
-    output_dir = os.path.join(config.OUTPUT_IMAGES_DIR, theme_key)
+    output_dir = config.get_images_dir(theme_key)
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"Theme: {theme_name}")

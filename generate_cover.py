@@ -28,6 +28,8 @@ PAPER_THICKNESS = 0.002252  # White paper, inches per page
 TRIM_WIDTH = config.PAGE_WIDTH_INCHES   # default 8.5"
 TRIM_HEIGHT = config.PAGE_HEIGHT_INCHES  # default 11"
 SAFE_MARGIN = 0.375  # Keep important content this far from trim edge
+SPINE_TEXT_CLEARANCE = 0.0625  # KDP requires 0.0625" clearance on each side of spine text
+MIN_PAGES_FOR_SPINE_TEXT = 79  # KDP minimum pages to allow spine text
 
 
 def calculate_cover_dimensions(total_pages: int, trim_w: float = TRIM_WIDTH, trim_h: float = TRIM_HEIGHT) -> dict:
@@ -67,7 +69,7 @@ def calculate_cover_dimensions(total_pages: int, trim_w: float = TRIM_WIDTH, tri
 
 def count_pages(theme: str) -> int:
     """Count total pages from generated images."""
-    image_dir = os.path.join(config.OUTPUT_IMAGES_DIR, theme)
+    image_dir = config.get_images_dir(theme)
     if not os.path.exists(image_dir):
         return config.COLORING_PAGES_PER_BOOK * 2 + 3  # Estimate
 
@@ -160,12 +162,12 @@ def _generate_image_ai33(prompt: str, aspect_ratio: str = "1:1") -> Image.Image 
     return None
 
 
-def generate_front_artwork(theme: str, title: str = "", renderer: str = "gemini") -> Image.Image | None:
+def generate_front_artwork(theme: str, title: str = "", renderer: str = "gemini", size: str = config.DEFAULT_PAGE_SIZE) -> Image.Image | None:
     """Generate front cover artwork using Gemini or AI33 API."""
     theme_config = config.THEMES[theme]
 
     # Try to load cover_prompt from plan file
-    plan_path = os.path.join("plans", f"{theme}_plan.json")
+    plan_path = config.get_plan_path(theme)
     cover_prompt_from_plan = None
     if os.path.exists(plan_path):
         with open(plan_path) as f:
@@ -196,7 +198,8 @@ Use a clean, attractive background with vibrant colors."""
     print(f"Generating front cover artwork (renderer: {renderer})...")
 
     if renderer == "ai33":
-        return _generate_image_ai33(prompt, aspect_ratio="3:4")
+        ar = config.PAGE_SIZES[size]["ai33_aspect_ratio"]
+        return _generate_image_ai33(prompt, aspect_ratio=ar)
 
     # Gemini renderer
     api_key = os.getenv("GOOGLE_API_KEY")
@@ -268,7 +271,7 @@ def colorize_page(image_path: str, renderer: str = "gemini") -> Image.Image | No
 
 def get_sample_pages(theme: str, count: int = 6) -> list[str]:
     """Select evenly spaced sample pages from the theme."""
-    image_dir = os.path.join(config.OUTPUT_IMAGES_DIR, theme)
+    image_dir = config.get_images_dir(theme)
     pages = sorted([
         os.path.join(image_dir, f)
         for f in os.listdir(image_dir)
@@ -344,7 +347,7 @@ def build_cover(
         sys.exit(1)
 
     # Auto-detect page size from plan if not explicitly set
-    plan_path = os.path.join("plans", f"{theme}_plan.json")
+    plan_path = config.get_plan_path(theme)
     if size == config.DEFAULT_PAGE_SIZE and os.path.exists(plan_path):
         with open(plan_path) as f:
             plan_data_for_size = json.load(f)
@@ -403,7 +406,7 @@ def build_cover(
     draw = ImageDraw.Draw(cover)
 
     # --- Generate and place front cover artwork ---
-    artwork = generate_front_artwork(theme, title, renderer=renderer)
+    artwork = generate_front_artwork(theme, title, renderer=renderer, size=size)
     if artwork:
         # Resize artwork to fit front cover area
         front_w = dims["trim_w_px"]
@@ -511,11 +514,11 @@ def build_cover(
     desc_font = get_font(28, bold=False)
 
     # Count actual images
-    image_dir = os.path.join(config.OUTPUT_IMAGES_DIR, theme)
+    image_dir = config.get_images_dir(theme)
     num_images = len([f for f in os.listdir(image_dir) if f.endswith(".png")]) if os.path.exists(image_dir) else 0
 
     # Load plan for description
-    plan_path = os.path.join("plans", f"{theme}_plan.json")
+    plan_path = config.get_plan_path(theme)
     plan_desc = ""
     plan_audience = "adults"
     if os.path.exists(plan_path):
@@ -579,8 +582,9 @@ def build_cover(
         thumb_w = (back_area_w - (grid_cols - 1) * padding) // grid_cols
         thumb_h = (grid_avail_h - (grid_rows - 1) * padding) // grid_rows
 
-        # Keep aspect ratio (portrait pages are taller than wide)
-        page_ratio = 3300 / 2550  # ~1.294
+        # Keep aspect ratio based on book size (1.0 for square, ~1.294 for portrait)
+        page_dims_for_ratio = config.get_page_dims(size)
+        page_ratio = page_dims_for_ratio["height_px"] / page_dims_for_ratio["width_px"]
         if thumb_h / thumb_w > page_ratio:
             thumb_h = int(thumb_w * page_ratio)
         else:
@@ -631,18 +635,14 @@ def build_cover(
         fill="white",
         outline=(200, 200, 200),
     )
-    barcode_font = get_font(20)
-    draw.text(
-        (barcode_x + 10, barcode_y + barcode_h // 2 - 10),
-        "BARCODE AREA (KDP auto-generates)",
-        font=barcode_font,
-        fill=(180, 180, 180),
-    )
+    # No text in barcode area — KDP auto-generates the barcode here.
+    # Leaving template text like "BARCODE AREA" triggers manual review rejection.
 
     # --- Save PNG + PDF ---
-    os.makedirs(config.COVERS_DIR, exist_ok=True)
-    png_path = os.path.join(config.COVERS_DIR, f"{theme}_cover.png")
-    pdf_path = os.path.join(config.COVERS_DIR, f"{theme}_cover.pdf")
+    book_dir = config.get_book_dir(theme)
+    os.makedirs(book_dir, exist_ok=True)
+    png_path = config.get_cover_png_path(theme)
+    pdf_path = config.get_cover_pdf_path(theme)
 
     cover.save(png_path, "PNG", dpi=(config.DPI, config.DPI))
 

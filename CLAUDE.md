@@ -19,7 +19,7 @@ cp .env.example .env   # Add GOOGLE_API_KEY
 python plan_book.py --concept "cozy cats in a cafe" --audience adults --pages 25 --theme-key cozy_cat_cafe
 
 # 2. Generate images from plan
-python generate_images.py --plan plans/cozy_cat_cafe_plan.json --count 25
+python generate_images.py --plan output/cozy_cat_cafe/plan.json --count 25
 
 # 3. Build PDF
 python build_pdf.py --theme cozy_cat_cafe
@@ -31,12 +31,10 @@ python generate_cover.py --theme cozy_cat_cafe --author "Your Name"
 ## Architecture
 
 - `config.py` - KDP specs (8.5x11", 300 DPI, 0.25" margins), THEMES dict, Gemini model (`gemini-3.1-flash-image-preview`), base prompt template
-- `plan_book.py` - Gemini text-only call to generate SEO title, subtitle, description, 7 keywords, cover prompt, and 20-30 page prompts. Saves to `plans/` JSON + `prompts/` txt
-- `generate_images.py` - Calls Gemini API per prompt, post-processes to grayscale line art at 2550x3300px. Supports both theme-based (BASE_PROMPT + subject) and plan-based (full prompts from JSON) modes. Aspect ratio: 3:4 portrait
-- `build_pdf.py` - Assembles ReportLab PDF: title → copyright → coloring pages on odd pages with blank backs → thank you. Ensures even page count. **Requires theme in config.py THEMES dict**
-- `generate_cover.py` - Generates full KDP cover (front + spine + back) with Gemini API artwork and Pillow text overlay. **Requires theme in config.py THEMES dict**
-- `prompts/` - One text file per theme, each line = one subject/prompt
-- `plans/` - Plan JSON files with full book metadata + prompts
+- `plan_book.py` - Gemini text-only call to generate SEO title, subtitle, description, 7 keywords, cover prompt, and 20-30 page prompts. Saves to `output/{theme}/plan.json` + `output/{theme}/prompts.txt`
+- `generate_images.py` - Calls AI33 API per prompt, post-processes to grayscale line art. Supports both theme-based and plan-based modes. Saves to `output/{theme}/images/`
+- `build_pdf.py` - Assembles ReportLab PDF: title → copyright → coloring pages on odd pages with blank backs → thank you. Ensures even page count. Saves to `output/{theme}/interior.pdf`. **Requires theme in config.py THEMES dict**
+- `generate_cover.py` - Generates full KDP cover (front + spine + back) with AI33 artwork and Pillow text overlay. Saves to `output/{theme}/cover.png` + `cover.pdf`. **Requires theme in config.py THEMES dict**
 
 **Important**: `build_pdf.py` and `generate_cover.py` only accept `--theme` values registered in `config.py` THEMES dict. After `plan_book.py` creates a new theme, you must add it to THEMES before building the PDF or cover. `generate_images.py --plan` bypasses this requirement.
 
@@ -88,12 +86,48 @@ generate_images.py --theme → build_pdf.py → generate_cover.py
 ## Available Themes
 
 Built-in: `cute_animals`, `dinosaurs`, `vehicles`, `unicorn_fantasy`
-Custom: Any theme created via `plan_book.py` (saved in `plans/` and `prompts/`)
+Custom: Any theme created via `plan_book.py` (saved in `output/{theme}/`)
+
+## Output Structure
+
+All book files are organized under `output/{theme_key}/`:
+```
+output/{theme_key}/
+  ├── images/        — page_01.png, page_02.png, ...
+  ├── plan.json      — book metadata + prompts
+  ├── prompts.txt    — one prompt per line
+  ├── interior.pdf   — KDP interior PDF
+  ├── cover.png      — cover image
+  └── cover.pdf      — cover PDF for KDP upload
+```
+
+## KDP Manual Review — Rejection Triggers
+
+Based on [KDP Content Guidelines](https://kdp.amazon.com/en_US/help/topic/G202145060):
+
+### Will Cause Rejection
+- **Metadata mismatch**: title/author must match across title page, copyright page, cover, and spine
+- **Template text not removed**: e.g., placeholder text like "BARCODE AREA" on cover
+- **Binding terminology**: words like "spiral bound", "leather bound", "hard bound", "calendar" in metadata
+- **Illegible text** or content extending past margins
+- **Spine text on thin books**: spine text requires minimum 79 pages, with 0.0625" clearance per side
+
+### Technical Requirements
+- All images: minimum 300 DPI
+- Line thickness: minimum 0.75pt (0.01" / 0.3mm) for graphics
+- Grayscale fill: minimum 10% for gray backgrounds
+- Font size: minimum 7pt
+- Max 4 consecutive blank pages in body; max 10 at end
+- Even page count required
+- PDF must not be locked/encrypted, no crop marks/bookmarks/annotations
+- Transparent objects must be flattened
+- Max file size: 650MB
+
+### Publishing Limits
+- 10 titles per book format per week
 
 ## Key Conventions
 
-- Images saved as `page_XX.png` in `output/images/{theme}/`
-- Plans saved as `{theme_key}_plan.json` in `plans/`
 - `generate_images.py --start N` resumes from index N (skips existing files)
-- Cover files go in `covers/`
-- `.env` holds `GOOGLE_API_KEY` (never committed)
+- `build_pdf.py --author "Name"` adds author to title page + copyright (KDP metadata consistency)
+- `.env` holds `GOOGLE_API_KEY` and `AI33_KEY` (never committed)

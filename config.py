@@ -2,6 +2,7 @@
 Configuration for KDP Coloring Book Generator.
 All measurements based on Amazon KDP paperback specifications.
 """
+import os
 
 # --- Page Dimensions ---
 # Supported page sizes for KDP
@@ -29,7 +30,8 @@ DEFAULT_PAGE_SIZE = "8.5x11"
 PAGE_WIDTH_INCHES = 8.5
 PAGE_HEIGHT_INCHES = 11.0
 DPI = 300
-MARGIN_INCHES = 0.25
+MARGIN_INCHES = 0.25  # Outside, top, bottom margins
+GUTTER_MARGIN_INCHES = 0.25  # Default gutter (overridden by get_gutter_margin)
 
 # Derived pixel dimensions (default 8.5x11)
 PAGE_WIDTH_PX = int(PAGE_WIDTH_INCHES * DPI)   # 2550
@@ -41,19 +43,52 @@ SAFE_WIDTH_PX = PAGE_WIDTH_PX - (2 * MARGIN_PX)   # 2400
 SAFE_HEIGHT_PX = PAGE_HEIGHT_PX - (2 * MARGIN_PX)  # 3150
 
 
-def get_page_dims(size_key: str = DEFAULT_PAGE_SIZE) -> dict:
-    """Return pixel dimensions for a given page size key."""
+def get_gutter_margin(page_count: int) -> float:
+    """Return required gutter (inside) margin in inches based on KDP page count rules.
+
+    KDP requirements:
+    - 24-150 pages:  0.375"
+    - 151-300 pages: 0.500"
+    - 301-500 pages: 0.625"
+    - 501-700 pages: 0.750"
+    - 701-828 pages: 0.875"
+    - <24 pages:     0.25" (standard)
+    """
+    if page_count >= 701:
+        return 0.875
+    elif page_count >= 501:
+        return 0.75
+    elif page_count >= 301:
+        return 0.625
+    elif page_count >= 151:
+        return 0.5
+    elif page_count >= 24:
+        return 0.375
+    else:
+        return 0.25
+
+
+def get_page_dims(size_key: str = DEFAULT_PAGE_SIZE, page_count: int = 0) -> dict:
+    """Return pixel dimensions for a given page size key.
+
+    If page_count > 0, includes gutter_margin calculated from KDP rules.
+    """
     ps = PAGE_SIZES[size_key]
     w = int(ps["width"] * DPI)
     h = int(ps["height"] * DPI)
     m = int(MARGIN_INCHES * DPI)
+    gutter = get_gutter_margin(page_count) if page_count > 0 else MARGIN_INCHES
+    gutter_px = int(gutter * DPI)
     return {
         "width_inches": ps["width"],
         "height_inches": ps["height"],
         "width_px": w,
         "height_px": h,
         "margin_px": m,
-        "safe_width_px": w - 2 * m,
+        "margin_inches": MARGIN_INCHES,
+        "gutter_margin_inches": gutter,
+        "gutter_margin_px": gutter_px,
+        "safe_width_px": w - m - gutter_px,
         "safe_height_px": h - 2 * m,
         "aspect_ratio": ps["aspect_ratio"],
         "ai33_aspect_ratio": ps["ai33_aspect_ratio"],
@@ -62,7 +97,7 @@ def get_page_dims(size_key: str = DEFAULT_PAGE_SIZE) -> dict:
 # --- Gemini API ---
 GEMINI_MODEL = "gemini-3.1-flash-image-preview"  # Nano Banana Pro - fast image generation
 REQUEST_DELAY_SECONDS = 3  # Min delay between API calls (20 requests/min)
-MAX_PARALLEL_WORKERS = 5   # Concurrent image generation threads
+MAX_PARALLEL_WORKERS = 10   # Concurrent image generation threads
 MAX_RETRIES = 3
 
 # --- AI33 API ---
@@ -153,12 +188,93 @@ THEMES = {
         "prompt_file": "prompts/cat_lovers_bold_easy.txt",
         "page_size": "8.5x8.5",
     },
+    "cozy_spring_garden": {
+        "name": "Cozy Spring Garden",
+        "book_title": "Cozy Spring Garden \u2014 Bold and Easy Coloring Book",
+        "prompt_file": "prompts/cozy_spring_garden.txt",
+        "page_size": "8.5x8.5",
+    },
+    "easter_bold_easy_kids": {
+        "name": "Easter Bold and Easy for Kids",
+        "book_title": "Easter Coloring Book for Kids Ages 3-8: Bold and Easy Easter Egg, Bunny, and Spring Designs",
+        "prompt_file": "prompts/easter_bold_easy_kids.txt",
+        "page_size": "8.5x8.5",
+    },
+    "cottagecore_mushrooms": {
+        "name": "Cottagecore Mushrooms & Woodland",
+        "book_title": "Cottagecore Mushrooms & Woodland: A Cozy Coloring Book for Adults with Bold and Easy Designs",
+        "prompt_file": "prompts/cottagecore_mushrooms.txt",
+        "page_size": "8.5x8.5",
+    },
+    "mothers_day_floral": {
+        "name": "Mother's Day Flowers",
+        "book_title": "Mother's Day Flowers Coloring Book: A Beautiful Floral Gift for Mom",
+        "prompt_file": "prompts/mothers_day_floral.txt",
+        "page_size": "8.5x8.5",
+    },
+    "ocean_underwater_kids": {
+        "name": "Ocean & Underwater Adventures",
+        "book_title": "Ocean & Underwater Adventures Coloring Book for Kids Ages 3-8: Fun Sea Creatures with Bold and Easy Designs",
+        "prompt_file": "prompts/ocean_underwater_kids.txt",
+        "page_size": "8.5x8.5",
+    },
+    "monochrome_minimalist": {
+        "name": "Monochrome Minimalist",
+        "book_title": "Monochrome Minimalist Coloring Book: One Pen, Endless Calm — Bold and Easy Designs for Adults",
+        "prompt_file": "prompts/monochrome_minimalist.txt",
+        "page_size": "8.5x8.5",
+    },
+    "kawaii_food_sweets": {
+        "name": "Kawaii Food & Sweets",
+        "book_title": "Kawaii Food & Sweets Coloring Book: Cute Kawaii Food with Adorable Faces — Bold and Easy Designs for Kids, Teens & Adults",
+        "prompt_file": "prompts/kawaii_food_sweets.txt",
+        "page_size": "8.5x8.5",
+    },
+    "succulents_cacti": {
+        "name": "Succulents & Cacti",
+        "book_title": "Succulents & Cacti Coloring Book",
+        "prompt_file": "output/succulents_cacti/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
 }
 
 # --- Paths ---
-OUTPUT_IMAGES_DIR = "output/images"
-OUTPUT_BOOKS_DIR = "output/books"
-COVERS_DIR = "covers"
+OUTPUT_DIR = "output"
+
+
+def get_book_dir(theme_key: str) -> str:
+    """Return the output directory for a book: output/{theme_key}/"""
+    return os.path.join(OUTPUT_DIR, theme_key)
+
+
+def get_images_dir(theme_key: str) -> str:
+    """Return the images directory: output/{theme_key}/images/"""
+    return os.path.join(OUTPUT_DIR, theme_key, "images")
+
+
+def get_plan_path(theme_key: str) -> str:
+    """Return the plan JSON path: output/{theme_key}/plan.json"""
+    return os.path.join(OUTPUT_DIR, theme_key, "plan.json")
+
+
+def get_prompts_path(theme_key: str) -> str:
+    """Return the prompts file path: output/{theme_key}/prompts.txt"""
+    return os.path.join(OUTPUT_DIR, theme_key, "prompts.txt")
+
+
+def get_interior_pdf_path(theme_key: str) -> str:
+    """Return the interior PDF path: output/{theme_key}/interior.pdf"""
+    return os.path.join(OUTPUT_DIR, theme_key, "interior.pdf")
+
+
+def get_cover_png_path(theme_key: str) -> str:
+    """Return the cover PNG path: output/{theme_key}/cover.png"""
+    return os.path.join(OUTPUT_DIR, theme_key, "cover.png")
+
+
+def get_cover_pdf_path(theme_key: str) -> str:
+    """Return the cover PDF path: output/{theme_key}/cover.pdf"""
+    return os.path.join(OUTPUT_DIR, theme_key, "cover.pdf")
 
 # --- Base Prompt ---
 BASE_PROMPT = """Create a children's coloring book page in PORTRAIT orientation (taller than wide). Requirements:

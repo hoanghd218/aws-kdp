@@ -186,17 +186,15 @@ def main():
     }
 
     # Save JSON plan
-    plans_dir = "plans"
-    os.makedirs(plans_dir, exist_ok=True)
-    json_path = os.path.join(plans_dir, f"{args.theme_key}_plan.json")
+    book_dir = config.get_book_dir(args.theme_key)
+    os.makedirs(book_dir, exist_ok=True)
+    json_path = config.get_plan_path(args.theme_key)
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(ordered, f, indent=2, ensure_ascii=False)
     print(f"Saved plan JSON: {json_path}")
 
     # Save prompts text file (compatible with generate_images.py)
-    prompts_dir = "prompts"
-    os.makedirs(prompts_dir, exist_ok=True)
-    prompts_path = os.path.join(prompts_dir, f"{args.theme_key}.txt")
+    prompts_path = config.get_prompts_path(args.theme_key)
     with open(prompts_path, "w", encoding="utf-8") as f:
         for prompt_line in ordered["page_prompts"]:
             f.write(prompt_line.strip() + "\n")
