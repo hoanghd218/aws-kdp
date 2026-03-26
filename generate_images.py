@@ -156,6 +156,86 @@ def generate_coloring_page(prompt: str, aspect_ratio: str = "3:4") -> Image.Imag
     return None
 
 
+def generate_coloring_page_bimai(prompt: str, aspect_ratio: str = "9:16", resolution: str = "1k") -> Image.Image | None:
+    """Generate a single coloring page image using Bimai API (app.bimai.vn).
+
+    Submits a task, polls for completion, downloads the result image.
+    """
+    api_key = os.getenv("BIMAI_API_KEY")
+    if not api_key:
+        print("Error: BIMAI_API_KEY not found in .env file")
+        sys.exit(1)
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "prompt": prompt,
+        "display_name": config.BIMAI_DISPLAY_NAME,
+        "provider": config.BIMAI_PROVIDER,
+        "model": config.BIMAI_MODEL,
+        "aspect_ratio": aspect_ratio,
+        "resolution": resolution,
+    }
+
+    for attempt in range(config.MAX_RETRIES):
+        try:
+            resp = requests.post(config.BIMAI_API_URL, headers=headers, json=payload)
+            resp.raise_for_status()
+            result = resp.json()
+
+            if not result.get("succeeded"):
+                print(f"  Bimai submit failed (attempt {attempt + 1}): {result}")
+                continue
+
+            task_id = result["data"]["task_id"]
+            print(f"  Bimai task submitted: {task_id}")
+
+            # Poll for completion
+            elapsed = 0
+            while elapsed < config.BIMAI_POLL_TIMEOUT:
+                time.sleep(config.BIMAI_POLL_INTERVAL)
+                elapsed += config.BIMAI_POLL_INTERVAL
+
+                status_resp = requests.get(
+                    f"{config.BIMAI_STATUS_URL}/{task_id}",
+                    headers=headers,
+                )
+                status_resp.raise_for_status()
+                status = status_resp.json()
+                task_data = status.get("data", {})
+                task_status = task_data.get("status")
+
+                if task_status == "completed":
+                    image_url = task_data.get("image_url")
+                    if not image_url:
+                        print("  Warning: Task completed but no image_url returned")
+                        break
+                    img_resp = requests.get(image_url)
+                    img_resp.raise_for_status()
+                    pil_image = Image.open(io.BytesIO(img_resp.content))
+                    return pil_image
+
+                elif task_status == "failed":
+                    error_msg = task_data.get("error", "Unknown error")
+                    print(f"  Bimai error: {error_msg}")
+                    break
+                else:
+                    if elapsed % 15 == 0:
+                        print(f"  Polling... status={task_status}")
+
+            if elapsed >= config.BIMAI_POLL_TIMEOUT:
+                print(f"  Timeout waiting for Bimai task {task_id}")
+
+        except Exception as e:
+            print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
+            if attempt < config.MAX_RETRIES - 1:
+                time.sleep(config.REQUEST_DELAY_SECONDS * 2)
+
+    return None
+
+
 def post_process(image: Image.Image, size_key: str = config.DEFAULT_PAGE_SIZE) -> Image.Image:
     """Post-process generated image for coloring book quality."""
     dims = config.get_page_dims(size_key)
@@ -218,6 +298,12 @@ def main():
         default=config.DEFAULT_PAGE_SIZE,
         help=f"Page size (default: {config.DEFAULT_PAGE_SIZE})",
     )
+    parser.add_argument(
+        "--renderer",
+        choices=["bimai", "ai33"],
+        default="bimai",
+        help="Image renderer (default: bimai)",
+    )
     args = parser.parse_args()
 
     # Determine mode: plan-based or theme-based
@@ -250,7 +336,8 @@ def main():
     if use_raw_prompt:
         print(f"Plan: {args.plan}")
     dims = config.get_page_dims(args.size)
-    print(f"Renderer: AI33")
+    renderer_label = "Bimai (NanoPic)" if args.renderer == "bimai" else "AI33"
+    print(f"Renderer: {renderer_label}")
     print(f"Page size: {config.PAGE_SIZES[args.size]['label']}")
     print(f"Generating {len(prompts)} coloring pages...")
     print(f"Output: {output_dir}/")
@@ -274,7 +361,11 @@ def main():
             full_prompt = prompt_text
         else:
             full_prompt = config.BASE_PROMPT.format(age=config.TARGET_AGE, subject=prompt_text)
-        image = generate_coloring_page(full_prompt, aspect_ratio=dims["ai33_aspect_ratio"])
+
+        if args.renderer == "bimai":
+            image = generate_coloring_page_bimai(full_prompt, aspect_ratio=dims["bimai_aspect_ratio"])
+        else:
+            image = generate_coloring_page(full_prompt, aspect_ratio=dims["ai33_aspect_ratio"])
 
         if image:
             processed = post_process(image, size_key=args.size)

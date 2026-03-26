@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate a KDP-ready full cover (front + spine + back) for coloring books.
-Uses Gemini API to generate front cover artwork, then composites with text.
+Uses AI33 API to generate front cover artwork, then composites with text.
 """
 
 import argparse
@@ -14,8 +14,7 @@ import time
 
 import requests
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 import config
@@ -162,8 +161,84 @@ def _generate_image_ai33(prompt: str, aspect_ratio: str = "1:1") -> Image.Image 
     return None
 
 
-def generate_front_artwork(theme: str, title: str = "", renderer: str = "gemini", size: str = config.DEFAULT_PAGE_SIZE) -> Image.Image | None:
-    """Generate front cover artwork using Gemini or AI33 API."""
+def _generate_image_bimai(prompt: str, aspect_ratio: str = "9:16", resolution: str = "1k") -> Image.Image | None:
+    """Generate an image using Bimai API (app.bimai.vn)."""
+    api_key = os.getenv("BIMAI_API_KEY")
+    if not api_key:
+        print("Error: BIMAI_API_KEY not found in .env")
+        sys.exit(1)
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "prompt": prompt,
+        "display_name": config.BIMAI_DISPLAY_NAME,
+        "provider": config.BIMAI_PROVIDER,
+        "model": config.BIMAI_MODEL,
+        "aspect_ratio": aspect_ratio,
+        "resolution": resolution,
+    }
+
+    for attempt in range(config.MAX_RETRIES):
+        try:
+            resp = requests.post(config.BIMAI_API_URL, headers=headers, json=payload)
+            resp.raise_for_status()
+            result = resp.json()
+
+            if not result.get("succeeded"):
+                print(f"  Bimai submit failed (attempt {attempt + 1}): {result}")
+                continue
+
+            task_id = result["data"]["task_id"]
+            print(f"  Bimai task submitted: {task_id}")
+
+            # Poll for completion
+            elapsed = 0
+            while elapsed < config.BIMAI_POLL_TIMEOUT:
+                time.sleep(config.BIMAI_POLL_INTERVAL)
+                elapsed += config.BIMAI_POLL_INTERVAL
+
+                status_resp = requests.get(
+                    f"{config.BIMAI_STATUS_URL}/{task_id}",
+                    headers=headers,
+                )
+                status_resp.raise_for_status()
+                status = status_resp.json()
+                task_data = status.get("data", {})
+                task_status = task_data.get("status")
+
+                if task_status == "completed":
+                    image_url = task_data.get("image_url")
+                    if not image_url:
+                        print("  Warning: Task completed but no image_url returned")
+                        break
+                    img_resp = requests.get(image_url)
+                    img_resp.raise_for_status()
+                    return Image.open(io.BytesIO(img_resp.content))
+
+                elif task_status == "failed":
+                    error_msg = task_data.get("error", "Unknown error")
+                    print(f"  Bimai error: {error_msg}")
+                    break
+                else:
+                    if elapsed % 15 == 0:
+                        print(f"  Polling... status={task_status}")
+
+            if elapsed >= config.BIMAI_POLL_TIMEOUT:
+                print(f"  Timeout waiting for Bimai task {task_id}")
+
+        except Exception as e:
+            print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
+            if attempt < config.MAX_RETRIES - 1:
+                time.sleep(config.REQUEST_DELAY_SECONDS)
+
+    return None
+
+
+def generate_front_artwork(theme: str, title: str = "", renderer: str = "bimai", size: str = config.DEFAULT_PAGE_SIZE) -> Image.Image | None:
+    """Generate front cover artwork using the selected renderer."""
     theme_config = config.THEMES[theme]
 
     # Try to load cover_prompt from plan file
@@ -197,75 +272,18 @@ Use a clean, attractive background with vibrant colors."""
 
     print(f"Generating front cover artwork (renderer: {renderer})...")
 
-    if renderer == "ai33":
+    if renderer == "bimai":
+        ar = config.PAGE_SIZES[size]["bimai_aspect_ratio"]
+        return _generate_image_bimai(prompt, aspect_ratio=ar)
+    else:
         ar = config.PAGE_SIZES[size]["ai33_aspect_ratio"]
         return _generate_image_ai33(prompt, aspect_ratio=ar)
 
-    # Gemini renderer
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        print("Error: GOOGLE_API_KEY not found in .env")
-        sys.exit(1)
 
-    client = genai.Client(api_key=api_key)
-    for attempt in range(config.MAX_RETRIES):
-        try:
-            response = client.models.generate_content(
-                model=config.GEMINI_MODEL,
-                contents=[prompt],
-                config=types.GenerateContentConfig(
-                    response_modalities=["IMAGE", "TEXT"],
-                ),
-            )
-
-            for part in response.candidates[0].content.parts:
-                if part.inline_data is not None:
-                    image_data = part.inline_data.data
-                    return Image.open(io.BytesIO(image_data))
-
-            print(f"  No image in response (attempt {attempt + 1})")
-        except Exception as e:
-            print(f"  Error (attempt {attempt + 1}): {e}")
-
-    return None
-
-
-def colorize_page(image_path: str, renderer: str = "gemini") -> Image.Image | None:
-    """Use Gemini to colorize a line art coloring page. AI33 cannot colorize (text-to-image only)."""
-    if renderer == "ai33":
-        # AI33 is text-to-image only, cannot colorize existing images
-        # Return None to fall back to using original line art
-        return None
-
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        return None
-
-    client = genai.Client(api_key=api_key)
-
-    img = Image.open(image_path).convert("RGB")
-    img_small = img.resize((512, 664), Image.Resampling.LANCZOS)
-    img_bytes = io.BytesIO()
-    img_small.save(img_bytes, format="PNG")
-    img_bytes.seek(0)
-
-    try:
-        response = client.models.generate_content(
-            model=config.GEMINI_MODEL,
-            contents=[
-                types.Part.from_bytes(data=img_bytes.read(), mime_type="image/png"),
-                prompt,
-            ],
-            config=types.GenerateContentConfig(
-                response_modalities=["IMAGE", "TEXT"],
-            ),
-        )
-        for part in response.candidates[0].content.parts:
-            if part.inline_data is not None:
-                return Image.open(io.BytesIO(part.inline_data.data)).convert("RGB")
-    except Exception as e:
-        print(f"  Colorize failed: {e}")
-
+def colorize_page(image_path: str, renderer: str = "ai33") -> Image.Image | None:
+    """Colorize a line art coloring page. AI33 is text-to-image only, cannot colorize."""
+    # AI33 is text-to-image only, cannot colorize existing images
+    # Return None to fall back to using original line art
     return None
 
 
@@ -338,7 +356,7 @@ def build_cover(
     kdp_width: float | None = None,
     kdp_height: float | None = None,
     size: str = config.DEFAULT_PAGE_SIZE,
-    renderer: str = "gemini",
+    renderer: str = "ai33",
 ):
     """Build the complete cover image."""
     theme_config = config.THEMES.get(theme)
@@ -698,9 +716,9 @@ def main():
     )
     parser.add_argument(
         "--renderer",
-        choices=["gemini", "ai33"],
-        default="gemini",
-        help="Image renderer: 'gemini' or 'ai33' (default: gemini)",
+        choices=["bimai", "ai33"],
+        default="bimai",
+        help="Image renderer (default: bimai)",
     )
     args = parser.parse_args()
 

@@ -12,6 +12,7 @@ PAGE_SIZES = {
         "height": 11.0,
         "aspect_ratio": "3:4",       # For Gemini API
         "ai33_aspect_ratio": "3:4",  # For AI33 API
+        "bimai_aspect_ratio": "9:16",  # For Bimai API
         "label": "8.5\" x 11\" (Portrait)",
     },
     "8.5x8.5": {
@@ -19,6 +20,7 @@ PAGE_SIZES = {
         "height": 8.5,
         "aspect_ratio": "1:1",       # For Gemini API
         "ai33_aspect_ratio": "1:1",  # For AI33 API
+        "bimai_aspect_ratio": "1:1",  # For Bimai API
         "label": "8.5\" x 8.5\" (Square)",
     },
 }
@@ -92,6 +94,7 @@ def get_page_dims(size_key: str = DEFAULT_PAGE_SIZE, page_count: int = 0) -> dic
         "safe_height_px": h - 2 * m,
         "aspect_ratio": ps["aspect_ratio"],
         "ai33_aspect_ratio": ps["ai33_aspect_ratio"],
+        "bimai_aspect_ratio": ps["bimai_aspect_ratio"],
     }
 
 # --- Gemini API ---
@@ -108,6 +111,15 @@ AI33_RESOLUTION = "2K"
 AI33_ASPECT_RATIO = "3:4"  # Portrait for coloring books
 AI33_POLL_INTERVAL = 5  # Seconds between status polls
 AI33_POLL_TIMEOUT = 300  # Max seconds to wait for image generation
+
+# --- Bimai API (app.bimai.vn) ---
+BIMAI_API_URL = "https://api.bimai.vn/api/v1/generate"
+BIMAI_STATUS_URL = "https://api.bimai.vn/api/v1/tasks"
+BIMAI_DISPLAY_NAME = "NanoPic"
+BIMAI_PROVIDER = "NanoPic"
+BIMAI_MODEL = "NanoPic"
+BIMAI_POLL_INTERVAL = 5   # Seconds between status polls
+BIMAI_POLL_TIMEOUT = 300  # Max seconds to wait for image generation
 
 # --- Book Settings ---
 COLORING_PAGES_PER_BOOK = 30
