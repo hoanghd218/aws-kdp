@@ -3,6 +3,7 @@
 Generate a KDP-ready full cover (front + spine + back) for coloring books.
 Uses Gemini API to generate front cover artwork, then composites with text.
 """
+from __future__ import annotations
 
 import argparse
 import io

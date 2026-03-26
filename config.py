@@ -247,6 +247,61 @@ THEMES = {
         "book_title": "The Boy Who Learned Tech: A Coding Adventure Coloring Book for Kids Ages 6-12",
         "prompt_file": "prompts/tech_boy_adventure.txt",
     },
+    "little_corner": {
+        "name": "Hygge Havens",
+        "book_title": "Little Corner: Coloring Book for Adults and Teens, Super Cute Designs of Cozy, Hygge Spaces for Relaxation",
+        "prompt_file": "prompts/little_corner.txt",
+    },
+    "cozy_cat_kids": {
+        "name": "Cozy Cats",
+        "book_title": "Cozy Cats Coloring Book for Kids Ages 6-12",
+        "prompt_file": "prompts/cozy_cat_kids.txt",
+    },
+    "cozy_dog_kids": {
+        "name": "Cozy Dogs",
+        "book_title": "Cozy Dogs Coloring Book for Kids Ages 6-12",
+        "prompt_file": "prompts/cozy_dog_kids.txt",
+    },
+    "race_cars_vehicles": {
+        "name": "Race Cars & Vehicles",
+        "book_title": "Race Cars & Vehicles Coloring Book for Kids Ages 5-9",
+        "prompt_file": "output/race_cars_vehicles/prompts.txt",
+    },
+    "airplanes_helicopters": {
+        "name": "Airplanes & Helicopters",
+        "book_title": "Airplanes and Helicopters Coloring Book for Kids Ages 3-7: 50 Bold and Easy Aircraft Designs with Planes, Helicopters, and Flying Fun",
+        "prompt_file": "output/airplanes_helicopters/prompts.txt",
+    },
+    "flowers_garden_kids": {
+        "name": "Flowers & Garden Kids",
+        "book_title": "Flowers & Garden Coloring Book for Kids Ages 5-10: 50 Bold and Easy Flower Species, Garden Scenes, and Nature Designs",
+        "prompt_file": "output/flowers_garden_kids/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "weather_seasons": {
+        "name": "Weather & Seasons",
+        "book_title": "Weather & Seasons Coloring Book for Kids Ages 4-8: 50 Bold and Easy Designs of Sun, Rain, Snow, and the Four Seasons",
+        "prompt_file": "output/weather_seasons/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "alphabet_animals_abc": {
+        "name": "Alphabet Animals ABC",
+        "book_title": "Alphabet Animals ABC Coloring Book for Toddlers: Big Letters, Bold Lines, and Cute Animals for Ages 2-5",
+        "prompt_file": "output/alphabet_animals_abc/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "numbers_counting": {
+        "name": "Numbers & Counting",
+        "book_title": "Numbers & Counting Coloring Book for Kids Ages 2-5: Bold and Easy",
+        "prompt_file": "output/numbers_counting/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "summer_beach_fun": {
+        "name": "Summer Beach Fun",
+        "book_title": "Summer Beach Fun Coloring Book for Kids Ages 4-8: 50 Bold and Easy Beach Scenes with Sandcastles, Ocean Waves, and Summer Vacation Activities",
+        "prompt_file": "output/summer_beach_fun/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
 }
 
 # --- Paths ---

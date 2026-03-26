@@ -3,6 +3,7 @@
 Generate coloring book page images using AI33 API.
 Each image is a black-and-white line art suitable for coloring.
 """
+from __future__ import annotations
 
 import argparse
 import io
