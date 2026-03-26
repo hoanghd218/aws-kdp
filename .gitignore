@@ -1,6 +1,9 @@
-__pycache__/
-*.pyc
-.venv/
-venv/
-.DS_Store
-*.zip
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+*.zip
+config.bat
+node_modules
+.env

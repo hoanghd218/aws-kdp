@@ -3,6 +3,7 @@
 Build a KDP-ready PDF coloring book from generated images.
 Layout: title page, copyright, coloring pages on odd pages with blank backs.
 """
+from __future__ import annotations
 
 import argparse
 import datetime
