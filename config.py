@@ -97,7 +97,7 @@ def get_page_dims(size_key: str = DEFAULT_PAGE_SIZE, page_count: int = 0) -> dic
 # --- Gemini API ---
 GEMINI_MODEL = "gemini-3.1-flash-image-preview"  # Nano Banana Pro - fast image generation
 REQUEST_DELAY_SECONDS = 3  # Min delay between API calls (20 requests/min)
-MAX_PARALLEL_WORKERS = 10   # Concurrent image generation threads
+MAX_PARALLEL_WORKERS = 3   # Concurrent image generation threads (reduced to avoid rate limits)
 MAX_RETRIES = 3
 
 # --- AI33 API ---
@@ -300,6 +300,12 @@ THEMES = {
         "name": "Summer Beach Fun",
         "book_title": "Summer Beach Fun Coloring Book for Kids Ages 4-8: 50 Bold and Easy Beach Scenes with Sandcastles, Ocean Waves, and Summer Vacation Activities",
         "prompt_file": "output/summer_beach_fun/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "halloween_cute_spooky": {
+        "name": "Halloween Cute & Spooky",
+        "book_title": "Halloween Cute & Spooky Coloring Book for Kids Ages 3-7: 50 Big and Simple Halloween Designs with Friendly Ghosts, Pumpkins, and Kawaii Creatures",
+        "prompt_file": "output/halloween_cute_spooky/prompts.txt",
         "page_size": "8.5x8.5",
     },
 }
