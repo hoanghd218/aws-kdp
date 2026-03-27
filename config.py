@@ -4,6 +4,15 @@ All measurements based on Amazon KDP paperback specifications.
 """
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# --- Author (from .env) ---
+DEFAULT_AUTHOR_FIRST = os.getenv("AUTHOR_FIRST_NAME", "").strip()
+DEFAULT_AUTHOR_LAST = os.getenv("AUTHOR_LAST_NAME", "").strip()
+DEFAULT_AUTHOR = f"{DEFAULT_AUTHOR_FIRST} {DEFAULT_AUTHOR_LAST}".strip()
+
 # --- Page Dimensions ---
 # Supported page sizes for KDP
 PAGE_SIZES = {
@@ -318,6 +327,12 @@ THEMES = {
         "name": "Halloween Cute & Spooky",
         "book_title": "Halloween Cute & Spooky Coloring Book for Kids Ages 3-7: 50 Big and Simple Halloween Designs with Friendly Ghosts, Pumpkins, and Kawaii Creatures",
         "prompt_file": "output/halloween_cute_spooky/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "4th_july_patriotic": {
+        "name": "4th of July Cute Patriotic",
+        "book_title": "4th of July Coloring Book for Kids Ages 3-7: 50 Big and Simple Patriotic Designs with Cute Eagles, Fireworks, and Stars",
+        "prompt_file": "output/4th_july_patriotic/prompts.txt",
         "page_size": "8.5x8.5",
     },
 }

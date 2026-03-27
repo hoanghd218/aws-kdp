@@ -78,7 +78,7 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None,
         else:
             subtitle = f"Coloring Book for Kids Ages {config.TARGET_AGE}"
 
-    # Load author from plan if not provided via CLI
+    # Load author: CLI > plan.json > .env default
     if not author:
         import json
         plan_path = config.get_plan_path(theme)
@@ -92,6 +92,8 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None,
                     author = f"{first} {last}".strip()
                 elif isinstance(author_obj, str):
                     author = author_obj
+    if not author:
+        author = config.DEFAULT_AUTHOR
 
     images = get_sorted_images(theme)
     print(f"Found {len(images)} coloring pages")
