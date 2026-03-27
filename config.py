@@ -124,11 +124,25 @@ AI33_POLL_TIMEOUT = 300  # Max seconds to wait for image generation
 # --- Bimai API (app.bimai.vn) ---
 BIMAI_API_URL = "https://api.bimai.vn/api/v1/generate"
 BIMAI_STATUS_URL = "https://api.bimai.vn/api/v1/tasks"
-BIMAI_DISPLAY_NAME = "NanoPic"
-BIMAI_PROVIDER = "NanoPic"
-BIMAI_MODEL = "NanoPic"
+BIMAI_DISPLAY_NAME = "Google Flow"
+BIMAI_PROVIDER = "Google Flow"
+BIMAI_MODEL = "Google Flow"
 BIMAI_POLL_INTERVAL = 5   # Seconds between status polls
 BIMAI_POLL_TIMEOUT = 300  # Max seconds to wait for image generation
+
+# --- NanoPic API (nanoai.pics) ---
+NANOPIC_API_URL = "https://flow-api.nanoai.pics/api/v2/images/create"
+NANOPIC_STATUS_URL = "https://flow-api.nanoai.pics/api/v2/task"
+NANOPIC_MODEL = "GEM_PIX_2"
+NANOPIC_POLL_INTERVAL = 5
+NANOPIC_POLL_TIMEOUT = 300
+NANOPIC_ASPECT_RATIOS = {
+    "1:1": "IMAGE_ASPECT_RATIO_SQUARE",
+    "3:4": "IMAGE_ASPECT_RATIO_PORTRAIT",
+    "9:16": "IMAGE_ASPECT_RATIO_PORTRAIT",
+    "4:3": "IMAGE_ASPECT_RATIO_LANDSCAPE",
+    "16:9": "IMAGE_ASPECT_RATIO_LANDSCAPE",
+}
 
 # --- Book Settings ---
 COLORING_PAGES_PER_BOOK = 30
@@ -329,10 +343,64 @@ THEMES = {
         "prompt_file": "output/halloween_cute_spooky/prompts.txt",
         "page_size": "8.5x8.5",
     },
+    "summer_road_trip": {
+        "name": "Summer Road Trip Adventure",
+        "book_title": "Summer Road Trip Adventure Coloring Book for Kids Ages 4-8: 50 Bold and Easy Designs with Cars, Camping, Road Signs, and Vacation Fun",
+        "prompt_file": "output/summer_road_trip/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
     "4th_july_patriotic": {
         "name": "4th of July Cute Patriotic",
         "book_title": "4th of July Coloring Book for Kids Ages 3-7: 50 Big and Simple Patriotic Designs with Cute Eagles, Fireworks, and Stars",
         "prompt_file": "output/4th_july_patriotic/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "sunflower_fields": {
+        "name": "Sunflower Fields",
+        "book_title": "Sunflower Fields Coloring Book: Beautiful Sunflowers, Farmhouse Scenes, and Golden Meadows with Bold and Easy Designs for Adults",
+        "prompt_file": "output/sunflower_fields/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "rose_garden": {
+        "name": "Rose Garden Collection",
+        "book_title": "Rose Garden Collection Coloring Book: Beautiful Roses, Romantic Blooms, and Cozy Garden Scenes with Bold and Easy Designs for Adults",
+        "prompt_file": "output/rose_garden/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "autumn_leaves_forest": {
+        "name": "Autumn Leaves & Forest",
+        "book_title": "Autumn Leaves & Forest Coloring Book: Cozy Fall Scenes with Bold and Easy Designs for Adults",
+        "prompt_file": "output/autumn_leaves_forest/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "herb_garden_kitchen": {
+        "name": "Herb Garden & Kitchen Herbs",
+        "book_title": "Herb Garden & Kitchen Herbs Coloring Book: Cute Kawaii Herbs with Cozy Cottagecore Scenes for Adults",
+        "prompt_file": "output/herb_garden_kitchen/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "cherry_blossom_garden": {
+        "name": "Japanese Cherry Blossom Garden",
+        "book_title": "Japanese Cherry Blossom Garden Coloring Book: Serene Temples, Torii Gates, and Sakura Scenes for Adults",
+        "prompt_file": "output/cherry_blossom_garden/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "tropical_botanical": {
+        "name": "Tropical Botanical Paradise",
+        "book_title": "Tropical Botanical Paradise Coloring Book: Lush Tropical Plants, Exotic Flowers, and Jungle Scenes with Bold and Easy Designs for Adults",
+        "prompt_file": "output/tropical_botanical/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "wildflower_meadow": {
+        "name": "Wildflower Meadow",
+        "book_title": "Wildflower Meadow Coloring Book: Beautiful Botanical Scenes with Bold and Easy Designs for Adults",
+        "prompt_file": "output/wildflower_meadow/prompts.txt",
+        "page_size": "8.5x8.5",
+    },
+    "lavender_dreams": {
+        "name": "Lavender Dreams",
+        "book_title": "Lavender Dreams Coloring Book: Provence Lavender Fields, Stone Cottages, and Cozy Garden Scenes with Bold and Easy Designs for Adults",
+        "prompt_file": "output/lavender_dreams/prompts.txt",
         "page_size": "8.5x8.5",
     },
 }

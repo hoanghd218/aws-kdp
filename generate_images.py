@@ -237,6 +237,89 @@ def generate_coloring_page_bimai(prompt: str, aspect_ratio: str = "9:16", resolu
     return None
 
 
+def generate_coloring_page_nanopic(prompt: str, aspect_ratio: str = "1:1") -> Image.Image | None:
+    """Generate a single coloring page image using NanoPic API (nanoai.pics).
+
+    Submits a task, polls for completion, downloads the result image.
+    """
+    api_key = os.getenv("NANOPIC_API_KEY")
+    access_token = os.getenv("NANOPIC_ACCESS_TOKEN")
+    if not api_key or not access_token:
+        print("Error: NANOPIC_API_KEY or NANOPIC_ACCESS_TOKEN not found in .env file")
+        sys.exit(1)
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    nanopic_ar = config.NANOPIC_ASPECT_RATIOS.get(aspect_ratio, "IMAGE_ASPECT_RATIO_SQUARE")
+
+    for attempt in range(config.MAX_RETRIES):
+        try:
+            payload = {
+                "accessToken": access_token,
+                "promptText": prompt,
+                "imageUrls": [],
+                "aspectRatio": nanopic_ar,
+                "imageModel": config.NANOPIC_MODEL,
+            }
+            resp = requests.post(config.NANOPIC_API_URL, headers=headers, json=payload)
+            resp.raise_for_status()
+            result = resp.json()
+
+            task_id = result.get("taskId") or result.get("data", {}).get("taskId")
+            if not task_id:
+                # Response may contain taskId at top level or nested
+                # Try to find it in the response
+                for key in result:
+                    if "task" in key.lower() and isinstance(result[key], str):
+                        task_id = result[key]
+                        break
+            if not task_id:
+                print(f"  NanoPic submit failed (attempt {attempt + 1}): no taskId in {result}")
+                continue
+
+            print(f"  NanoPic task submitted: {task_id}")
+
+            # Poll for completion
+            elapsed = 0
+            while elapsed < config.NANOPIC_POLL_TIMEOUT:
+                time.sleep(config.NANOPIC_POLL_INTERVAL)
+                elapsed += config.NANOPIC_POLL_INTERVAL
+
+                status_resp = requests.get(
+                    f"{config.NANOPIC_STATUS_URL}?taskId={task_id}",
+                    headers=headers,
+                )
+                status_resp.raise_for_status()
+                status = status_resp.json()
+
+                if status.get("success") and status.get("data", {}).get("fifeUrl"):
+                    image_url = status["data"]["fifeUrl"]
+                    img_resp = requests.get(image_url)
+                    img_resp.raise_for_status()
+                    pil_image = Image.open(io.BytesIO(img_resp.content))
+                    return pil_image
+
+                if status.get("code") == "error" or status.get("success") is False:
+                    error_msg = status.get("message", "Unknown error")
+                    print(f"  NanoPic error: {error_msg}")
+                    break
+
+                if elapsed % 15 == 0:
+                    print(f"  Polling... status={status.get('code', 'pending')}")
+
+            if elapsed >= config.NANOPIC_POLL_TIMEOUT:
+                print(f"  Timeout waiting for NanoPic task {task_id}")
+
+        except Exception as e:
+            print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
+            if attempt < config.MAX_RETRIES - 1:
+                time.sleep(config.REQUEST_DELAY_SECONDS * 2)
+
+    return None
+
+
 def post_process(image: Image.Image, size_key: str = config.DEFAULT_PAGE_SIZE) -> Image.Image:
     """Post-process generated image for coloring book quality."""
     dims = config.get_page_dims(size_key)
@@ -301,7 +384,7 @@ def main():
     )
     parser.add_argument(
         "--renderer",
-        choices=["bimai", "ai33"],
+        choices=["bimai", "ai33", "nanopic"],
         default="bimai",
         help="Image renderer (default: bimai)",
     )
@@ -365,6 +448,8 @@ def main():
 
         if args.renderer == "bimai":
             image = generate_coloring_page_bimai(full_prompt, aspect_ratio=dims["bimai_aspect_ratio"])
+        elif args.renderer == "nanopic":
+            image = generate_coloring_page_nanopic(full_prompt, aspect_ratio=dims["ai33_aspect_ratio"])
         else:
             image = generate_coloring_page(full_prompt, aspect_ratio=dims["ai33_aspect_ratio"])
 

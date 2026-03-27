@@ -272,7 +272,6 @@ The artwork should be high quality, detailed, and appealing.
 Use a clean, attractive background with vibrant colors."""
 
     print(f"Generating front cover artwork (renderer: {renderer})...")
-    renderer="bimai"
     if renderer == "bimai":
         ar = config.PAGE_SIZES[size]["bimai_aspect_ratio"]
         return _generate_image_bimai(prompt, aspect_ratio=ar)
