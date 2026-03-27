@@ -272,7 +272,7 @@ The artwork should be high quality, detailed, and appealing.
 Use a clean, attractive background with vibrant colors."""
 
     print(f"Generating front cover artwork (renderer: {renderer})...")
-
+    renderer="bimai"
     if renderer == "bimai":
         ar = config.PAGE_SIZES[size]["bimai_aspect_ratio"]
         return _generate_image_bimai(prompt, aspect_ratio=ar)
@@ -381,6 +381,20 @@ def build_cover(
     page_dims = config.get_page_dims(size)
     trim_w = page_dims["width_inches"]
     trim_h = page_dims["height_inches"]
+
+    # Load author: CLI > plan.json > .env default
+    if not author:
+        plan_author_path = config.get_plan_path(theme)
+        if os.path.exists(plan_author_path):
+            with open(plan_author_path) as f:
+                pa = json.load(f)
+                author_obj = pa.get("author", {})
+                if isinstance(author_obj, dict):
+                    author = f"{author_obj.get('first_name', '')} {author_obj.get('last_name', '')}".strip()
+                elif isinstance(author_obj, str):
+                    author = author_obj
+    if not author:
+        author = config.DEFAULT_AUTHOR
 
     title = custom_title or theme_config["book_title"]
     total_pages = count_pages(theme)
