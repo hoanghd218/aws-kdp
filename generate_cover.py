@@ -6,19 +6,17 @@ Uses AI33 API to generate front cover artwork, then composites with text.
 from __future__ import annotations
 
 import argparse
-import io
 import json
 import os
 import sys
-import textwrap
 import time
 
-import requests
 from dotenv import load_dotenv
 
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont
 
 import config
+from image_providers import generate_image, RENDERER_CHOICES, DEFAULT_RENDERER
 
 load_dotenv()
 
@@ -83,162 +81,7 @@ def count_pages(theme: str) -> int:
     return total
 
 
-def _generate_image_ai33(prompt: str, aspect_ratio: str = "1:1") -> Image.Image | None:
-    """Generate an image using AI33 API."""
-    api_key = os.getenv("AI33_KEY")
-    if not api_key:
-        print("Error: AI33_KEY not found in .env")
-        sys.exit(1)
-
-    headers = {"xi-api-key": api_key}
-    model_params = json.dumps({
-        "aspect_ratio": aspect_ratio,
-        "resolution": config.AI33_RESOLUTION,
-    })
-
-    for attempt in range(config.MAX_RETRIES):
-        try:
-            resp = requests.post(
-                config.AI33_API_URL,
-                headers=headers,
-                data={
-                    "prompt": prompt,
-                    "model_id": config.AI33_MODEL_ID,
-                    "generations_count": "1",
-                    "model_parameters": model_params,
-                },
-            )
-            resp.raise_for_status()
-            result = resp.json()
-
-            if not result.get("success"):
-                print(f"  AI33 submit failed (attempt {attempt + 1}): {result}")
-                continue
-
-            task_id = result["task_id"]
-            credits_remaining = result.get("ec_remain_credits", "?")
-            print(f"  Task submitted: {task_id} (credits remaining: {credits_remaining})")
-
-            elapsed = 0
-            while elapsed < config.AI33_POLL_TIMEOUT:
-                time.sleep(config.AI33_POLL_INTERVAL)
-                elapsed += config.AI33_POLL_INTERVAL
-
-                status_resp = requests.get(
-                    f"{config.AI33_STATUS_URL}/{task_id}",
-                    headers={"Content-Type": "application/json", "xi-api-key": api_key},
-                )
-                status_resp.raise_for_status()
-                status = status_resp.json()
-
-                if status.get("status") == "done":
-                    images = status.get("metadata", {}).get("result_images", [])
-                    if not images:
-                        print("  Warning: Task done but no images returned")
-                        break
-                    image_url = images[0].get("imageUrl")
-                    if not image_url:
-                        print("  Warning: No imageUrl in result")
-                        break
-                    img_resp = requests.get(image_url)
-                    img_resp.raise_for_status()
-                    return Image.open(io.BytesIO(img_resp.content))
-
-                elif status.get("status") == "error":
-                    print(f"  AI33 error: {status.get('error_message', 'Unknown error')}")
-                    break
-                else:
-                    progress = status.get("progress", 0)
-                    print(f"  Polling... status={status.get('status')} progress={progress}%")
-
-            if elapsed >= config.AI33_POLL_TIMEOUT:
-                print(f"  Timeout waiting for AI33 task {task_id}")
-
-        except Exception as e:
-            print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
-            if attempt < config.MAX_RETRIES - 1:
-                time.sleep(config.REQUEST_DELAY_SECONDS)
-
-    return None
-
-
-def _generate_image_bimai(prompt: str, aspect_ratio: str = "9:16", resolution: str = "1k") -> Image.Image | None:
-    """Generate an image using Bimai API (app.bimai.vn)."""
-    api_key = os.getenv("BIMAI_API_KEY")
-    if not api_key:
-        print("Error: BIMAI_API_KEY not found in .env")
-        sys.exit(1)
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "prompt": prompt,
-        "display_name": config.BIMAI_DISPLAY_NAME,
-        "provider": config.BIMAI_PROVIDER,
-        "model": config.BIMAI_MODEL,
-        "aspect_ratio": aspect_ratio,
-        "resolution": resolution,
-    }
-
-    for attempt in range(config.MAX_RETRIES):
-        try:
-            resp = requests.post(config.BIMAI_API_URL, headers=headers, json=payload)
-            resp.raise_for_status()
-            result = resp.json()
-
-            if not result.get("succeeded"):
-                print(f"  Bimai submit failed (attempt {attempt + 1}): {result}")
-                continue
-
-            task_id = result["data"]["task_id"]
-            print(f"  Bimai task submitted: {task_id}")
-
-            # Poll for completion
-            elapsed = 0
-            while elapsed < config.BIMAI_POLL_TIMEOUT:
-                time.sleep(config.BIMAI_POLL_INTERVAL)
-                elapsed += config.BIMAI_POLL_INTERVAL
-
-                status_resp = requests.get(
-                    f"{config.BIMAI_STATUS_URL}/{task_id}",
-                    headers=headers,
-                )
-                status_resp.raise_for_status()
-                status = status_resp.json()
-                task_data = status.get("data", {})
-                task_status = task_data.get("status")
-
-                if task_status == "completed":
-                    image_url = task_data.get("image_url")
-                    if not image_url:
-                        print("  Warning: Task completed but no image_url returned")
-                        break
-                    img_resp = requests.get(image_url)
-                    img_resp.raise_for_status()
-                    return Image.open(io.BytesIO(img_resp.content))
-
-                elif task_status == "failed":
-                    error_msg = task_data.get("error", "Unknown error")
-                    print(f"  Bimai error: {error_msg}")
-                    break
-                else:
-                    if elapsed % 15 == 0:
-                        print(f"  Polling... status={task_status}")
-
-            if elapsed >= config.BIMAI_POLL_TIMEOUT:
-                print(f"  Timeout waiting for Bimai task {task_id}")
-
-        except Exception as e:
-            print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
-            if attempt < config.MAX_RETRIES - 1:
-                time.sleep(config.REQUEST_DELAY_SECONDS)
-
-    return None
-
-
-def generate_front_artwork(theme: str, title: str = "", renderer: str = "bimai", size: str = config.DEFAULT_PAGE_SIZE) -> Image.Image | None:
+def generate_front_artwork(theme: str, title: str = "", renderer: str = DEFAULT_RENDERER, size: str = config.DEFAULT_PAGE_SIZE) -> Image.Image | None:
     """Generate front cover artwork using the selected renderer."""
     theme_config = config.THEMES[theme]
 
@@ -272,12 +115,9 @@ The artwork should be high quality, detailed, and appealing.
 Use a clean, attractive background with vibrant colors."""
 
     print(f"Generating front cover artwork (renderer: {renderer})...")
-    if renderer == "bimai":
-        ar = config.PAGE_SIZES[size]["bimai_aspect_ratio"]
-        return _generate_image_bimai(prompt, aspect_ratio=ar)
-    else:
-        ar = config.PAGE_SIZES[size]["ai33_aspect_ratio"]
-        return _generate_image_ai33(prompt, aspect_ratio=ar)
+    ar_key = "bimai_aspect_ratio" if renderer == "bimai" else "ai33_aspect_ratio"
+    ar = config.PAGE_SIZES[size][ar_key]
+    return generate_image(prompt, renderer=renderer, aspect_ratio=ar)
 
 
 def colorize_page(image_path: str, renderer: str = "ai33") -> Image.Image | None:
@@ -356,7 +196,7 @@ def build_cover(
     kdp_width: float | None = None,
     kdp_height: float | None = None,
     size: str = config.DEFAULT_PAGE_SIZE,
-    renderer: str = "ai33",
+    renderer: str = DEFAULT_RENDERER,
 ):
     """Build the complete cover image."""
     theme_config = config.THEMES.get(theme)
@@ -730,9 +570,9 @@ def main():
     )
     parser.add_argument(
         "--renderer",
-        choices=["bimai", "ai33"],
-        default="bimai",
-        help="Image renderer (default: bimai)",
+        choices=RENDERER_CHOICES,
+        default=DEFAULT_RENDERER,
+        help=f"Image renderer (default: {DEFAULT_RENDERER} from .env)",
     )
     args = parser.parse_args()
 

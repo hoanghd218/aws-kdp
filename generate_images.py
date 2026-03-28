@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
 """
-Generate coloring book page images using AI33 API.
+Generate coloring book page images using AI image providers.
 Each image is a black-and-white line art suitable for coloring.
 """
 from __future__ import annotations
 
 import argparse
-import io
 import json
 import os
 import sys
-import time
 
-import requests
 from dotenv import load_dotenv
 from PIL import Image, ImageEnhance, ImageOps
 
 import config
+from image_providers import generate_image, RENDERER_CHOICES, DEFAULT_RENDERER
 
 load_dotenv()
 
@@ -40,11 +38,7 @@ def load_subjects(theme: str) -> list[str]:
 
 
 def load_plan_prompts(plan_path: str) -> tuple[str, list[str], str | None]:
-    """Load theme key, full prompts, and page_size from a plan JSON file.
-
-    Returns:
-        (theme_key, list_of_full_prompts, page_size_or_None)
-    """
+    """Load theme key, full prompts, and page_size from a plan JSON file."""
     if not os.path.exists(plan_path):
         print(f"Error: Plan file not found: {plan_path}")
         sys.exit(1)
@@ -62,287 +56,26 @@ def load_plan_prompts(plan_path: str) -> tuple[str, list[str], str | None]:
         print("Error: Plan file has no 'page_prompts'")
         sys.exit(1)
 
-    page_size = plan.get("page_size")  # e.g. "8.5x11" or "8.5x8.5"
-
+    page_size = plan.get("page_size")
     return theme_key, page_prompts, page_size
-
-
-def generate_coloring_page(prompt: str, aspect_ratio: str = "3:4") -> Image.Image | None:
-    """Generate a single coloring page image using AI33 API.
-
-    Submits a task, polls for completion, downloads the result image.
-    """
-    api_key = os.getenv("AI33_KEY")
-    if not api_key:
-        print("Error: AI33_KEY not found in .env file")
-        sys.exit(1)
-
-    headers = {"xi-api-key": api_key}
-    model_params = json.dumps({
-        "aspect_ratio": aspect_ratio,
-        "resolution": config.AI33_RESOLUTION,
-    })
-
-    for attempt in range(config.MAX_RETRIES):
-        try:
-            # Submit generation task
-            resp = requests.post(
-                config.AI33_API_URL,
-                headers=headers,
-                data={
-                    "prompt": prompt,
-                    "model_id": config.AI33_MODEL_ID,
-                    "generations_count": "1",
-                    "model_parameters": model_params,
-                },
-            )
-            resp.raise_for_status()
-            result = resp.json()
-
-            if not result.get("success"):
-                print(f"  AI33 submit failed (attempt {attempt + 1}): {result}")
-                continue
-
-            task_id = result["task_id"]
-            credits_remaining = result.get("ec_remain_credits", "?")
-            print(f"  Task submitted: {task_id} (credits remaining: {credits_remaining})")
-
-            # Poll for completion
-            elapsed = 0
-            while elapsed < config.AI33_POLL_TIMEOUT:
-                time.sleep(config.AI33_POLL_INTERVAL)
-                elapsed += config.AI33_POLL_INTERVAL
-
-                status_resp = requests.get(
-                    f"{config.AI33_STATUS_URL}/{task_id}",
-                    headers={"Content-Type": "application/json", "xi-api-key": api_key},
-                )
-                status_resp.raise_for_status()
-                status = status_resp.json()
-
-                if status.get("status") == "done":
-                    images = status.get("metadata", {}).get("result_images", [])
-                    if not images:
-                        print(f"  Warning: Task done but no images returned")
-                        break
-
-                    image_url = images[0].get("imageUrl")
-                    if not image_url:
-                        print(f"  Warning: No imageUrl in result")
-                        break
-
-                    # Download the image
-                    img_resp = requests.get(image_url)
-                    img_resp.raise_for_status()
-                    pil_image = Image.open(io.BytesIO(img_resp.content))
-                    return pil_image
-
-                elif status.get("status") == "error":
-                    print(f"  AI33 error: {status.get('error_message', 'Unknown error')}")
-                    break
-
-                else:
-                    progress = status.get("progress", 0)
-                    if elapsed % 15 == 0:  # Log every 15 seconds
-                        print(f"  Polling... status={status.get('status')} progress={progress}%")
-
-            if elapsed >= config.AI33_POLL_TIMEOUT:
-                print(f"  Timeout waiting for AI33 task {task_id}")
-
-        except Exception as e:
-            print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
-            if attempt < config.MAX_RETRIES - 1:
-                time.sleep(config.REQUEST_DELAY_SECONDS * 2)
-
-    return None
-
-
-def generate_coloring_page_bimai(prompt: str, aspect_ratio: str = "9:16", resolution: str = "1k") -> Image.Image | None:
-    """Generate a single coloring page image using Bimai API (app.bimai.vn).
-
-    Submits a task, polls for completion, downloads the result image.
-    """
-    api_key = os.getenv("BIMAI_API_KEY")
-    if not api_key:
-        print("Error: BIMAI_API_KEY not found in .env file")
-        sys.exit(1)
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "prompt": prompt,
-        "display_name": config.BIMAI_DISPLAY_NAME,
-        "provider": config.BIMAI_PROVIDER,
-        "model": config.BIMAI_MODEL,
-        "aspect_ratio": aspect_ratio,
-        "resolution": resolution,
-    }
-
-    for attempt in range(config.MAX_RETRIES):
-        try:
-            resp = requests.post(config.BIMAI_API_URL, headers=headers, json=payload)
-            resp.raise_for_status()
-            result = resp.json()
-
-            if not result.get("succeeded"):
-                print(f"  Bimai submit failed (attempt {attempt + 1}): {result}")
-                continue
-
-            task_id = result["data"]["task_id"]
-            print(f"  Bimai task submitted: {task_id}")
-
-            # Poll for completion
-            elapsed = 0
-            while elapsed < config.BIMAI_POLL_TIMEOUT:
-                time.sleep(config.BIMAI_POLL_INTERVAL)
-                elapsed += config.BIMAI_POLL_INTERVAL
-
-                status_resp = requests.get(
-                    f"{config.BIMAI_STATUS_URL}/{task_id}",
-                    headers=headers,
-                )
-                status_resp.raise_for_status()
-                status = status_resp.json()
-                task_data = status.get("data", {})
-                task_status = task_data.get("status")
-
-                if task_status == "completed":
-                    image_url = task_data.get("image_url")
-                    if not image_url:
-                        print("  Warning: Task completed but no image_url returned")
-                        break
-                    img_resp = requests.get(image_url)
-                    img_resp.raise_for_status()
-                    pil_image = Image.open(io.BytesIO(img_resp.content))
-                    return pil_image
-
-                elif task_status == "failed":
-                    error_msg = task_data.get("error", "Unknown error")
-                    print(f"  Bimai error: {error_msg}")
-                    break
-                else:
-                    if elapsed % 15 == 0:
-                        print(f"  Polling... status={task_status}")
-
-            if elapsed >= config.BIMAI_POLL_TIMEOUT:
-                print(f"  Timeout waiting for Bimai task {task_id}")
-
-        except Exception as e:
-            print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
-            if attempt < config.MAX_RETRIES - 1:
-                time.sleep(config.REQUEST_DELAY_SECONDS * 2)
-
-    return None
-
-
-def generate_coloring_page_nanopic(prompt: str, aspect_ratio: str = "1:1") -> Image.Image | None:
-    """Generate a single coloring page image using NanoPic API (nanoai.pics).
-
-    Submits a task, polls for completion, downloads the result image.
-    """
-    api_key = os.getenv("NANOPIC_API_KEY")
-    access_token = os.getenv("NANOPIC_ACCESS_TOKEN")
-    if not api_key or not access_token:
-        print("Error: NANOPIC_API_KEY or NANOPIC_ACCESS_TOKEN not found in .env file")
-        sys.exit(1)
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    nanopic_ar = config.NANOPIC_ASPECT_RATIOS.get(aspect_ratio, "IMAGE_ASPECT_RATIO_SQUARE")
-
-    for attempt in range(config.MAX_RETRIES):
-        try:
-            payload = {
-                "accessToken": access_token,
-                "promptText": prompt,
-                "imageUrls": [],
-                "aspectRatio": nanopic_ar,
-                "imageModel": config.NANOPIC_MODEL,
-            }
-            resp = requests.post(config.NANOPIC_API_URL, headers=headers, json=payload)
-            resp.raise_for_status()
-            result = resp.json()
-
-            task_id = result.get("taskId") or result.get("data", {}).get("taskId")
-            if not task_id:
-                # Response may contain taskId at top level or nested
-                # Try to find it in the response
-                for key in result:
-                    if "task" in key.lower() and isinstance(result[key], str):
-                        task_id = result[key]
-                        break
-            if not task_id:
-                print(f"  NanoPic submit failed (attempt {attempt + 1}): no taskId in {result}")
-                continue
-
-            print(f"  NanoPic task submitted: {task_id}")
-
-            # Poll for completion
-            elapsed = 0
-            while elapsed < config.NANOPIC_POLL_TIMEOUT:
-                time.sleep(config.NANOPIC_POLL_INTERVAL)
-                elapsed += config.NANOPIC_POLL_INTERVAL
-
-                status_resp = requests.get(
-                    f"{config.NANOPIC_STATUS_URL}?taskId={task_id}",
-                    headers=headers,
-                )
-                status_resp.raise_for_status()
-                status = status_resp.json()
-
-                if status.get("success") and status.get("data", {}).get("fifeUrl"):
-                    image_url = status["data"]["fifeUrl"]
-                    img_resp = requests.get(image_url)
-                    img_resp.raise_for_status()
-                    pil_image = Image.open(io.BytesIO(img_resp.content))
-                    return pil_image
-
-                if status.get("code") == "error" or status.get("success") is False:
-                    error_msg = status.get("message", "Unknown error")
-                    print(f"  NanoPic error: {error_msg}")
-                    break
-
-                if elapsed % 15 == 0:
-                    print(f"  Polling... status={status.get('code', 'pending')}")
-
-            if elapsed >= config.NANOPIC_POLL_TIMEOUT:
-                print(f"  Timeout waiting for NanoPic task {task_id}")
-
-        except Exception as e:
-            print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
-            if attempt < config.MAX_RETRIES - 1:
-                time.sleep(config.REQUEST_DELAY_SECONDS * 2)
-
-    return None
 
 
 def post_process(image: Image.Image, size_key: str = config.DEFAULT_PAGE_SIZE) -> Image.Image:
     """Post-process generated image for coloring book quality."""
     dims = config.get_page_dims(size_key)
 
-    # Convert to grayscale
     image = ImageOps.grayscale(image)
-
-    # Fit image into safe area while preserving aspect ratio (no distortion)
     image = ImageOps.contain(
         image,
         (dims["safe_width_px"], dims["safe_height_px"]),
         Image.Resampling.LANCZOS,
     )
 
-    # Increase contrast to make lines crisp black on white
     enhancer = ImageEnhance.Contrast(image)
     image = enhancer.enhance(2.0)
-
-    # Increase brightness to ensure white background
     enhancer = ImageEnhance.Brightness(image)
     image = enhancer.enhance(1.3)
 
-    # Create full page with margins (white background), center the image
     full_page = Image.new("L", (dims["width_px"], dims["height_px"]), 255)
     paste_x = (dims["width_px"] - image.size[0]) // 2
     paste_y = (dims["height_px"] - image.size[1]) // 2
@@ -359,34 +92,25 @@ def main():
         help="Coloring book theme (required unless --plan is used)",
     )
     parser.add_argument(
-        "--plan",
-        type=str,
-        default=None,
+        "--plan", type=str, default=None,
         help="Path to a plan JSON file (from plan_book.py output)",
     )
     parser.add_argument(
-        "--count",
-        type=int,
-        default=config.COLORING_PAGES_PER_BOOK,
+        "--count", type=int, default=config.COLORING_PAGES_PER_BOOK,
         help=f"Number of pages to generate (default: {config.COLORING_PAGES_PER_BOOK})",
     )
     parser.add_argument(
-        "--start",
-        type=int,
-        default=0,
+        "--start", type=int, default=0,
         help="Start index in subject list (for resuming)",
     )
     parser.add_argument(
-        "--size",
-        choices=config.PAGE_SIZES.keys(),
+        "--size", choices=config.PAGE_SIZES.keys(),
         default=config.DEFAULT_PAGE_SIZE,
         help=f"Page size (default: {config.DEFAULT_PAGE_SIZE})",
     )
     parser.add_argument(
-        "--renderer",
-        choices=["bimai", "ai33", "nanopic"],
-        default="bimai",
-        help="Image renderer (default: bimai)",
+        "--renderer", choices=RENDERER_CHOICES, default=DEFAULT_RENDERER,
+        help=f"Image renderer (default: {DEFAULT_RENDERER} from .env)",
     )
     args = parser.parse_args()
 
@@ -396,10 +120,8 @@ def main():
         theme_key, prompts, plan_page_size = load_plan_prompts(args.plan)
         use_raw_prompt = True
         theme_name = theme_key
-        # Auto-detect page size from plan if not explicitly set via CLI
         if plan_page_size and plan_page_size in config.PAGE_SIZES and args.size == config.DEFAULT_PAGE_SIZE:
             args.size = plan_page_size
-        # Use theme config name if available, otherwise use theme_key
         if theme_key in config.THEMES:
             theme_name = config.THEMES[theme_key]["name"]
     elif args.theme:
@@ -409,25 +131,22 @@ def main():
     else:
         parser.error("--theme is required unless --plan is provided")
 
-    # Limit to requested count
     end_idx = min(args.start + args.count, len(prompts))
     prompts = prompts[args.start : end_idx]
 
     output_dir = config.get_images_dir(theme_key)
     os.makedirs(output_dir, exist_ok=True)
 
+    dims = config.get_page_dims(args.size)
     print(f"Theme: {theme_name}")
     if use_raw_prompt:
         print(f"Plan: {args.plan}")
-    dims = config.get_page_dims(args.size)
-    renderer_label = "Bimai (NanoPic)" if args.renderer == "bimai" else "AI33"
-    print(f"Renderer: {renderer_label}")
+    print(f"Renderer: {args.renderer}")
     print(f"Page size: {config.PAGE_SIZES[args.size]['label']}")
     print(f"Generating {len(prompts)} coloring pages...")
     print(f"Output: {output_dir}/")
     print()
 
-    # --- Generate pages (parallel via AI33 async tasks) ---
     def _generate_one(i_prompt):
         i, prompt_text = i_prompt
         page_num = args.start + i + 1
@@ -446,12 +165,8 @@ def main():
         else:
             full_prompt = config.BASE_PROMPT.format(age=config.TARGET_AGE, subject=prompt_text)
 
-        if args.renderer == "bimai":
-            image = generate_coloring_page_bimai(full_prompt, aspect_ratio=dims["bimai_aspect_ratio"])
-        elif args.renderer == "nanopic":
-            image = generate_coloring_page_nanopic(full_prompt, aspect_ratio=dims["ai33_aspect_ratio"])
-        else:
-            image = generate_coloring_page(full_prompt, aspect_ratio=dims["ai33_aspect_ratio"])
+        ar = dims["bimai_aspect_ratio"] if args.renderer == "bimai" else dims["ai33_aspect_ratio"]
+        image = generate_image(full_prompt, renderer=args.renderer, aspect_ratio=ar)
 
         if image:
             processed = post_process(image, size_key=args.size)

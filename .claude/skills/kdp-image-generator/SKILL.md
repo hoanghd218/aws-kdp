@@ -1,11 +1,11 @@
 ---
 name: kdp-image-generator
-description: Generate coloring page images using AI33 API. USE WHEN user says 'generate coloring pages', 'create coloring images', 'generate images for book', 'run image generation', 'kdp generate images', 'make coloring page images', 'generate pages from plan'.
+description: Generate coloring page images using the configured image renderer (set via IMAGE_RENDERER in .env). USE WHEN user says 'generate coloring pages', 'create coloring images', 'generate images for book', 'run image generation', 'kdp generate images', 'make coloring page images', 'generate pages from plan'.
 ---
 
 # KDP Image Generator
 
-Generates coloring book page images using AI33 API. This is the ONLY step that calls an external API — for image generation only, not prompt writing.
+Generates coloring book page images using the configured image renderer (from `IMAGE_RENDERER` in `.env`). Supported renderers: `ai33`, `bimai`, `nanopic`. This is the ONLY step that calls an external API — for image generation only, not prompt writing.
 
 ---
 
@@ -23,7 +23,7 @@ Generates coloring book page images using AI33 API. This is the ONLY step that c
 
 Check that:
 1. Plan exists: `output/{theme_key}/plan.json`
-2. `.env` has `AI33_KEY`
+2. `.env` has `IMAGE_RENDERER` set (e.g. `bimai`, `ai33`, or `nanopic`) and the corresponding API key (`BIMAI_API_KEY`, `AI33_KEY`, or `NANOPIC_API_KEY`)
 3. Dependencies installed: `pip install Pillow python-dotenv requests`
 
 ```bash
@@ -80,8 +80,9 @@ Check:
 
 ## Technical Details
 
-- **API**: AI33 proxy API (model `gemini-3.1-flash-image-preview` at 2K resolution)
-- **Requires**: `AI33_KEY` in `.env`
+- **Renderer**: Configured via `IMAGE_RENDERER` in `.env` (supports: `ai33`, `bimai`, `nanopic`)
+- **Requires**: Corresponding API key in `.env` (`AI33_KEY`, `BIMAI_API_KEY`, or `NANOPIC_API_KEY`)
+- **Override**: Use `--renderer` flag to override the `.env` default
 - **Post-processing**: Grayscale conversion, contrast +2.0, brightness +1.3
 - **Margins**: 0.25" (75px) — image centered on full page
 - **Parallel**: Up to 5 concurrent workers for faster generation

@@ -3,9 +3,9 @@ name: kdp-cover-creator
 description: >
   Generate full-color KDP book cover (front + spine + back) as PDF.
   Handles both 8.5x11 (portrait) and 8.5x8.5 (square) books with correct
-  aspect ratios. Uses AI33 API for artwork. Outputs cover PNG + PDF ready
-  for KDP upload. USE WHEN user says 'make cover', 'generate cover',
-  'create book cover', 'kdp cover', 'tao bia sach', 'cover pdf',
+  aspect ratios. Uses the configured image renderer (from IMAGE_RENDERER in .env) for artwork.
+  Outputs cover PNG + PDF ready for KDP upload. USE WHEN user says 'make cover',
+  'generate cover', 'create book cover', 'kdp cover', 'tao bia sach', 'cover pdf',
   'build cover', 'cover for coloring book'.
 ---
 
@@ -61,14 +61,17 @@ The aspect ratio affects:
 Run `generate_cover.py` with the correct parameters:
 
 ```bash
-# For 8.5x11 (portrait) books:
-python generate_cover.py --theme {theme_key} --author "{author}" --size 8.5x11 --renderer ai33
+# For 8.5x11 (portrait) books (renderer auto-detected from .env IMAGE_RENDERER):
+python generate_cover.py --theme {theme_key} --author "{author}" --size 8.5x11
 
 # For 8.5x8.5 (square) books:
-python generate_cover.py --theme {theme_key} --author "{author}" --size 8.5x8.5 --renderer ai33
+python generate_cover.py --theme {theme_key} --author "{author}" --size 8.5x8.5
+
+# Override renderer if needed:
+python generate_cover.py --theme {theme_key} --author "{author}" --size 8.5x11 --renderer ai33
 ```
 
-**IMPORTANT**: Before running, verify that `generate_cover.py` uses the correct aspect ratio for the book size. The code in `generate_front_artwork()` must pass the right aspect ratio to `_generate_image_ai33()`:
+**IMPORTANT**: Before running, verify that `generate_cover.py` uses the correct aspect ratio for the book size. The code in `generate_front_artwork()` must pass the right aspect ratio to the renderer:
 
 - For 8.5x11: `aspect_ratio="3:4"`
 - For 8.5x8.5: `aspect_ratio="1:1"`

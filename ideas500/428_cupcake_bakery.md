@@ -1,0 +1,32 @@
+---
+topic: Cupcake & Bakery
+audience: kids
+style: kawaii
+season: evergreen
+score: 4.0/5
+researched: 2026-03-27
+status: idea
+---
+
+# Cupcake & Bakery Coloring Book
+
+## Why This Idea
+Fun-themed kids coloring books are evergreen sellers with high volume repeat purchases. Cupcake & Bakery offers a focused theme with dedicated buyer interest and opportunities for unique, high-quality illustrations that stand out in the marketplace.
+
+## Market Analysis
+- **Demand**: 4.0/5 — Kawaii style has consistent appeal especially with younger demographics
+- **Competition**: 3.5/5 — Moderate competition, quality differentiation is key
+- **Timing**: 4.5/5 — Evergreen demand, consistent year-round sales
+- **Differentiation**: 4.0/5 — Unique kawaii approach differentiates from generic options
+- **Production Fit**: 4.0/5 — Kawaii style works well with AI-generated line art
+
+## Target Audience
+Children ages 3-10 and parents looking for engaging, imaginative coloring activities.
+
+## Suggested Approach
+- **Page count**: 35
+- **Style**: Cute kawaii style with rounded shapes, big eyes, and adorable characters
+- **Key themes**: Various cupcake & bakery scenes and compositions showcasing different aspects of the theme
+
+## Keywords to Target
+cupcake & bakery coloring book, kawaii cupcake & bakery coloring, cute cupcake & bakery coloring book, cupcake & bakery coloring book for kids, cupcake & bakery coloring pages children, cupcake & bakery coloring pages

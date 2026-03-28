@@ -82,7 +82,7 @@ python generate_cover.py --theme {theme_key} --author "Author Name" --title "Cus
 **Cover layout (left to right):**
 - **Back cover**: Light background + description text + barcode placeholder
 - **Spine**: Colored bar (text only if 79+ pages)
-- **Front cover**: Gemini-generated artwork + title overlay + subtitle + author
+- **Front cover**: AI-generated artwork (via IMAGE_RENDERER in .env) + title overlay + subtitle + author
 
 **Cover dimensions** are auto-calculated based on page count:
 - Spine width = total_pages x 0.002252" (white paper thickness)

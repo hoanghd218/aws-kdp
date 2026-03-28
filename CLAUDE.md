@@ -32,16 +32,17 @@ python generate_cover.py --theme cozy_cat_cafe --author "Your Name"
 
 - `config.py` - KDP specs (8.5x11", 300 DPI, 0.25" margins), THEMES dict, Gemini model (`gemini-3.1-flash-image-preview`), base prompt template
 - `plan_book.py` - Gemini text-only call to generate SEO title, subtitle, description, 7 keywords, cover prompt, and 20-30 page prompts. Saves to `output/{theme}/plan.json` + `output/{theme}/prompts.txt`
-- `generate_images.py` - Calls AI33 API per prompt, post-processes to grayscale line art. Supports both theme-based and plan-based modes. Saves to `output/{theme}/images/`
+- `image_providers.py` - Shared image generation providers (AI33, Bimai, NanoPic). Default renderer set via `IMAGE_RENDERER` in `.env`
+- `generate_images.py` - Calls configured image renderer per prompt, post-processes to grayscale line art. Supports both theme-based and plan-based modes. Saves to `output/{theme}/images/`
 - `build_pdf.py` - Assembles ReportLab PDF: title → copyright → coloring pages on odd pages with blank backs → thank you. Ensures even page count. Saves to `output/{theme}/interior.pdf`. **Requires theme in config.py THEMES dict**
-- `generate_cover.py` - Generates full KDP cover (front + spine + back) with AI33 artwork and Pillow text overlay. Saves to `output/{theme}/cover.png` + `cover.pdf`. **Requires theme in config.py THEMES dict**
+- `generate_cover.py` - Generates full KDP cover (front + spine + back) with AI-generated artwork and Pillow text overlay. Saves to `output/{theme}/cover.png` + `cover.pdf`. **Requires theme in config.py THEMES dict**
 
 **Important**: `build_pdf.py` and `generate_cover.py` only accept `--theme` values registered in `config.py` THEMES dict. After `plan_book.py` creates a new theme, you must add it to THEMES before building the PDF or cover. `generate_images.py --plan` bypasses this requirement.
 
 ## Custom Commands (Skills)
 
-- `/kdp-create-book` - **End-to-end book creation**: interviews user, plans with Gemini, generates images, reviews, builds PDF, creates cover
-- `/kdp-image-generator` - Generate coloring page images with Gemini API (theme-based or plan-based)
+- `/kdp-create-book` - **End-to-end book creation**: interviews user, plans, generates images, reviews, builds PDF, creates cover
+- `/kdp-image-generator` - Generate coloring page images with configured renderer from `.env` (theme-based or plan-based)
 - `/kdp-image-reviewer` - Review image quality, check KDP compliance, identify pages needing regeneration
 - `/kdp-cover-creator` - Generate full-color book covers with correct KDP dimensions and spine width
 
@@ -130,4 +131,4 @@ Based on [KDP Content Guidelines](https://kdp.amazon.com/en_US/help/topic/G20214
 
 - `generate_images.py --start N` resumes from index N (skips existing files)
 - `build_pdf.py --author "Name"` adds author to title page + copyright (KDP metadata consistency)
-- `.env` holds `GOOGLE_API_KEY` and `AI33_KEY` (never committed)
+- `.env` holds `IMAGE_RENDERER` (default renderer: `ai33`, `bimai`, or `nanopic`), API keys (`GOOGLE_API_KEY`, `AI33_KEY`, `BIMAI_API_KEY`, `NANOPIC_API_KEY`), and author info (never committed)
