@@ -41,6 +41,7 @@ All prompts must be written specifically for image generation and must later cre
 Every coloring page prompt must follow a refined "cute cozy medium-detail" adult aesthetic with complete, layered scenes that never feel empty, but all details must remain clean, bold, and easy to color.
 Absolutely avoid dense clusters of small shapes; all vegetation, plants, flowers must be drawn using large, simple, stylized shapes with wide line spacing.
 Characters must maintain consistent kawaii proportions and expressive poses.
+CRITICAL: Every prompt MUST include this instruction: "The illustration must NOT have any border, frame, or rectangular outline around the edges. The artwork extends naturally with NO enclosing box or boundary line."
 
 Output format (respond ONLY with this JSON, no other text):
 {{

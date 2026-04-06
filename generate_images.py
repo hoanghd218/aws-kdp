@@ -51,9 +51,9 @@ def load_plan_prompts(plan_path: str) -> tuple[str, list[str], str | None]:
         print("Error: Plan file missing 'theme_key'")
         sys.exit(1)
 
-    page_prompts = plan.get("page_prompts", [])
+    page_prompts = plan.get("page_prompts", []) or plan.get("prompts", [])
     if not page_prompts:
-        print("Error: Plan file has no 'page_prompts'")
+        print("Error: Plan file has no 'page_prompts' or 'prompts'")
         sys.exit(1)
 
     page_size = plan.get("page_size")

@@ -24,13 +24,14 @@ PAGE_COUNT = 50
 ADULT_PREFIX = (
     "Black and white line art illustration for an adult coloring book, "
     "cute cozy medium-detail aesthetic, bold clean outlines, large open shapes for easy coloring, "
-    "no shading. NO borders, NO frames, NO rectangular boundary lines around the image. "
+    "no shading. IMPORTANT: The illustration must NOT have any border, frame, or rectangular outline around the edges. "
+    "The line art should extend naturally to the edges with NO enclosing box or boundary line. "
     "White background. SQUARE format (1:1 aspect ratio). "
 )
 
 ADULT_SUFFIX = (
     "Clean bold outlines, cozy relaxing environment, easy-to-color shapes, "
-    "adult coloring book page. NO borders or frames."
+    "adult coloring book page. The artwork must have NO outer border, NO enclosing rectangle, NO frame around the image."
 )
 
 # Kids prompt prefix
@@ -42,7 +43,8 @@ KIDS_PREFIX = (
 KIDS_SUFFIX = (
     "Thick, clean, bold outlines. Simple enough for kids ages 6-12 to color. "
     "White background. The drawing fills most of the page. "
-    "No shading, no gray tones, no borders or frames. Style: cute, friendly, appealing to children."
+    "No shading, no gray tones. IMPORTANT: NO outer border, NO enclosing rectangle, NO frame around the image. "
+    "Style: cute, friendly, appealing to children."
 )
 
 

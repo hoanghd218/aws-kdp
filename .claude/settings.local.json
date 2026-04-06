@@ -34,7 +34,17 @@
       "mcp__mcp-registry__search_mcp_registry",
       "Bash(chmod +x /Users/hoangtran/Documents/Github/hoang-ai-marketing/.claude/skills/mkt-create-video-reels-text-overlay/scripts/render_reels.sh)",
       "Bash(bash .claude/skills/mkt-create-video-reels-text-overlay/scripts/render_reels.sh --message \"4 Mùa Cuộc Sống — Jim Rohn:\\\\n1. Đông — Khó khăn sẽ đến, hãy chuẩn bị\\\\n2. Xuân — Cơ hội mở ra, hãy gieo hạt\\\\n3. Hạ — Bảo vệ thành quả khỏi cỏ dại\\\\n4. Thu — Gặt hái, rồi Đông lại quay lại\" --video workspace/assets/reels/videos/3.mp4 --music \"workspace/assets/reels/music/nhac truyen cam hung.mp3\" --watermark \"@hoang.ai\" --output workspace/content/reels-4-mua-remotion-test.mp4)",
-      "Bash(python generate_images.py --plan plans/tech_boy_adventure_plan.json --count 10)"
+      "Bash(python generate_images.py --plan plans/tech_boy_adventure_plan.json --count 10)",
+      "Bash(python .claude/skills/kdp-cover-checker/scripts/check_covers.py)",
+      "Bash(pip install:*)",
+      "Bash(python generate_cover.py --theme alphabet_animals_abc)",
+      "Bash(gtimeout 180 python generate_cover.py --theme alphabet_animals_abc)",
+      "Bash(python generate_cover.py --theme alphabet_animals_abc --renderer nanopic)",
+      "WebFetch(domain:kdp.amazon.com)",
+      "Bash(python build_pdf.py --theme airplanes_helicopters)",
+      "Bash(python generate_cover.py --theme airplanes_helicopters --renderer nanopic)",
+      "Bash(python build_pdf.py --theme 4th_july_patriotic)",
+      "Bash(python generate_cover.py --theme 4th_july_patriotic --renderer nanopic)"
     ],
     "deny": [],
     "ask": []

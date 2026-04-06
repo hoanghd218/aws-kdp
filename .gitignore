@@ -4,3 +4,7 @@ __pycache__/
 venv/
 .DS_Store
 *.zip
+output/**/*.png
+/cc_scape/jadesummer_research
+/.firecrawl
+/jade_summer_idea

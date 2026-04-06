@@ -2,6 +2,7 @@
 Configuration for KDP Coloring Book Generator.
 All measurements based on Amazon KDP paperback specifications.
 """
+import json
 import os
 
 from dotenv import load_dotenv
@@ -22,6 +23,7 @@ PAGE_SIZES = {
         "aspect_ratio": "3:4",       # For Gemini API
         "ai33_aspect_ratio": "3:4",  # For AI33 API
         "bimai_aspect_ratio": "9:16",  # For Bimai API
+        "kie_aspect_ratio": "3:4",    # For Kie.ai API
         "label": "8.5\" x 11\" (Portrait)",
     },
     "8.5x8.5": {
@@ -30,6 +32,7 @@ PAGE_SIZES = {
         "aspect_ratio": "1:1",       # For Gemini API
         "ai33_aspect_ratio": "1:1",  # For AI33 API
         "bimai_aspect_ratio": "1:1",  # For Bimai API
+        "kie_aspect_ratio": "1:1",    # For Kie.ai API
         "label": "8.5\" x 8.5\" (Square)",
     },
 }
@@ -109,7 +112,7 @@ def get_page_dims(size_key: str = DEFAULT_PAGE_SIZE, page_count: int = 0) -> dic
 # --- Gemini API ---
 GEMINI_MODEL = "gemini-3.1-flash-image-preview"  # Nano Banana Pro - fast image generation
 REQUEST_DELAY_SECONDS = 3  # Min delay between API calls (20 requests/min)
-MAX_PARALLEL_WORKERS = 3   # Concurrent image generation threads (reduced to avoid rate limits)
+MAX_PARALLEL_WORKERS = 6   # Concurrent image generation threads
 MAX_RETRIES = 3
 
 # --- AI33 API ---
@@ -130,6 +133,14 @@ BIMAI_MODEL = "Google Flow"
 BIMAI_POLL_INTERVAL = 5   # Seconds between status polls
 BIMAI_POLL_TIMEOUT = 300  # Max seconds to wait for image generation
 
+# --- Kie.ai API ---
+KIE_API_URL = "https://api.kie.ai/api/v1/jobs/createTask"
+KIE_STATUS_URL = "https://api.kie.ai/api/v1/jobs/recordInfo"
+KIE_MODEL = "nano-banana-2"
+KIE_RESOLUTION = "1K"
+KIE_POLL_INTERVAL = 5
+KIE_POLL_TIMEOUT = 300
+
 # --- NanoPic API (nanoai.pics) ---
 NANOPIC_API_URL = "https://flow-api.nanoai.pics/api/v2/images/create"
 NANOPIC_STATUS_URL = "https://flow-api.nanoai.pics/api/v2/task"
@@ -147,263 +158,6 @@ NANOPIC_ASPECT_RATIOS = {
 # --- Book Settings ---
 COLORING_PAGES_PER_BOOK = 30
 TARGET_AGE = "6-12"
-
-# --- Themes ---
-THEMES = {
-    "cute_animals": {
-        "name": "Cute Animals",
-        "book_title": "Adorable Animals Coloring Book for Kids Ages 6-12",
-        "prompt_file": "prompts/cute_animals.txt",
-    },
-    "dinosaurs": {
-        "name": "Dinosaurs",
-        "book_title": "Amazing Dinosaurs Coloring Book for Kids Ages 6-12",
-        "prompt_file": "prompts/dinosaurs.txt",
-    },
-    "vehicles": {
-        "name": "Vehicles",
-        "book_title": "Cool Vehicles Coloring Book for Kids Ages 6-12",
-        "prompt_file": "prompts/vehicles.txt",
-    },
-    "unicorn_fantasy": {
-        "name": "Unicorn & Fantasy",
-        "book_title": "Magical Unicorns & Fantasy Coloring Book for Kids Ages 6-12",
-        "prompt_file": "prompts/unicorn_fantasy.txt",
-    },
-    "cute_animals_fun": {
-        "name": "Adorable Animals Coloring Fun",
-        "book_title": "Adorable Animals Coloring Fun for Kids Ages 6-12",
-        "prompt_file": "prompts/cute_animals_fun.txt",
-    },
-    "cozy_cat_cafe": {
-        "name": "Whiskers & Warmth",
-        "book_title": "Whiskers & Warmth: A Cozy Cat Café Coloring Book for Adults",
-        "prompt_file": "prompts/cozy_cat_cafe.txt",
-    },
-    "cute_astronaut": {
-        "name": "Stars & Serenity",
-        "book_title": "Stars & Serenity: A Cozy Astronaut Coloring Book for Adults",
-        "prompt_file": "prompts/cute_astronaut.txt",
-    },
-    "cute_aliens": {
-        "name": "Cosmic Cuties",
-        "book_title": "Cosmic Cuties: A Cozy Alien Coloring Book for Adults",
-        "prompt_file": "prompts/cute_aliens.txt",
-    },
-    "cozy_cats_daily_life": {
-        "name": "Cozy Cats Coloring Book",
-        "book_title": "Cozy Cats Coloring Book: Cute Cats in Daily Life with Easy and Bold Designs for Relaxation",
-        "prompt_file": "prompts/cozy_cats_daily_life.txt",
-    },
-    "self_care_girl": {
-        "name": "Self-Care Girl Coloring Book",
-        "book_title": "Self-Care Girl Coloring Book: Cute Cozy Daily Routines for Relaxation and Stress Relief",
-        "prompt_file": "prompts/self_care_girl.txt",
-    },
-    "sinh_vat_bien": {
-        "name": "Ocean Friends",
-        "book_title": "Ocean Friends Coloring Book for Kids Ages 6-12",
-        "prompt_file": "prompts/sinh_vat_bien.txt",
-    },
-    "cozy_kitchen": {
-        "name": "Cozy Kitchen",
-        "book_title": "Cozy Kitchen — Bold and Easy Coloring Book",
-        "prompt_file": "prompts/cozy_kitchen.txt",
-        "page_size": "8.5x8.5",
-    },
-    "cottage_garden": {
-        "name": "Cottage Garden",
-        "book_title": "Cottage Garden — Bold and Easy Coloring Book",
-        "prompt_file": "prompts/cottage_garden.txt",
-        "page_size": "8.5x8.5",
-    },
-    "cat_lovers_bold_easy": {
-        "name": "Cat Lovers Bold and Easy",
-        "book_title": "Cat Lovers Coloring Book: Bold and Easy Designs for Adults",
-        "prompt_file": "prompts/cat_lovers_bold_easy.txt",
-        "page_size": "8.5x8.5",
-    },
-    "cozy_spring_garden": {
-        "name": "Cozy Spring Garden",
-        "book_title": "Cozy Spring Garden \u2014 Bold and Easy Coloring Book",
-        "prompt_file": "prompts/cozy_spring_garden.txt",
-        "page_size": "8.5x8.5",
-    },
-    "easter_bold_easy_kids": {
-        "name": "Easter Bold and Easy for Kids",
-        "book_title": "Easter Coloring Book for Kids Ages 3-8: Bold and Easy Easter Egg, Bunny, and Spring Designs",
-        "prompt_file": "prompts/easter_bold_easy_kids.txt",
-        "page_size": "8.5x8.5",
-    },
-    "cottagecore_mushrooms": {
-        "name": "Cottagecore Mushrooms & Woodland",
-        "book_title": "Cottagecore Mushrooms & Woodland: A Cozy Coloring Book for Adults with Bold and Easy Designs",
-        "prompt_file": "prompts/cottagecore_mushrooms.txt",
-        "page_size": "8.5x8.5",
-    },
-    "mothers_day_floral": {
-        "name": "Mother's Day Flowers",
-        "book_title": "Mother's Day Flowers Coloring Book: A Beautiful Floral Gift for Mom",
-        "prompt_file": "prompts/mothers_day_floral.txt",
-        "page_size": "8.5x8.5",
-    },
-    "ocean_underwater_kids": {
-        "name": "Ocean & Underwater Adventures",
-        "book_title": "Ocean & Underwater Adventures Coloring Book for Kids Ages 3-8: Fun Sea Creatures with Bold and Easy Designs",
-        "prompt_file": "prompts/ocean_underwater_kids.txt",
-        "page_size": "8.5x8.5",
-    },
-    "monochrome_minimalist": {
-        "name": "Monochrome Minimalist",
-        "book_title": "Monochrome Minimalist Coloring Book: One Pen, Endless Calm — Bold and Easy Designs for Adults",
-        "prompt_file": "prompts/monochrome_minimalist.txt",
-        "page_size": "8.5x8.5",
-    },
-    "kawaii_food_sweets": {
-        "name": "Kawaii Food & Sweets",
-        "book_title": "Kawaii Food & Sweets Coloring Book: Cute Kawaii Food with Adorable Faces — Bold and Easy Designs for Kids, Teens & Adults",
-        "prompt_file": "prompts/kawaii_food_sweets.txt",
-        "page_size": "8.5x8.5",
-    },
-    "succulents_cacti": {
-        "name": "Succulents & Cacti",
-        "book_title": "Succulents & Cacti Coloring Book",
-        "prompt_file": "output/succulents_cacti/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "vintage_travel_destinations": {
-        "name": "Vintage Travel Destinations",
-        "book_title": "Vintage Wanderlust: Coloring Book for Adults, Bold and Easy",
-        "prompt_file": "output/vintage_travel_destinations/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "tech_boy_adventure": {
-        "name": "The Boy Who Learned Tech",
-        "book_title": "The Boy Who Learned Tech: A Coding Adventure Coloring Book for Kids Ages 6-12",
-        "prompt_file": "prompts/tech_boy_adventure.txt",
-    },
-    "little_corner": {
-        "name": "Hygge Havens",
-        "book_title": "Little Corner: Coloring Book for Adults and Teens, Super Cute Designs of Cozy, Hygge Spaces for Relaxation",
-        "prompt_file": "prompts/little_corner.txt",
-    },
-    "cozy_cat_kids": {
-        "name": "Cozy Cats",
-        "book_title": "Cozy Cats Coloring Book for Kids Ages 6-12",
-        "prompt_file": "prompts/cozy_cat_kids.txt",
-    },
-    "cozy_dog_kids": {
-        "name": "Cozy Dogs",
-        "book_title": "Cozy Dogs Coloring Book for Kids Ages 6-12",
-        "prompt_file": "prompts/cozy_dog_kids.txt",
-    },
-    "race_cars_vehicles": {
-        "name": "Race Cars & Vehicles",
-        "book_title": "Race Cars & Vehicles Coloring Book for Kids Ages 5-9",
-        "prompt_file": "output/race_cars_vehicles/prompts.txt",
-    },
-    "airplanes_helicopters": {
-        "name": "Airplanes & Helicopters",
-        "book_title": "Airplanes and Helicopters Coloring Book for Kids Ages 3-7: 50 Bold and Easy Aircraft Designs with Planes, Helicopters, and Flying Fun",
-        "prompt_file": "output/airplanes_helicopters/prompts.txt",
-    },
-    "flowers_garden_kids": {
-        "name": "Flowers & Garden Kids",
-        "book_title": "Flowers & Garden Coloring Book for Kids Ages 5-10: 50 Bold and Easy Flower Species, Garden Scenes, and Nature Designs",
-        "prompt_file": "output/flowers_garden_kids/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "weather_seasons": {
-        "name": "Weather & Seasons",
-        "book_title": "Weather & Seasons Coloring Book for Kids Ages 4-8: 50 Bold and Easy Designs of Sun, Rain, Snow, and the Four Seasons",
-        "prompt_file": "output/weather_seasons/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "alphabet_animals_abc": {
-        "name": "Alphabet Animals ABC",
-        "book_title": "Alphabet Animals ABC Coloring Book for Toddlers: Big Letters, Bold Lines, and Cute Animals for Ages 2-5",
-        "prompt_file": "output/alphabet_animals_abc/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "numbers_counting": {
-        "name": "Numbers & Counting",
-        "book_title": "Numbers & Counting Coloring Book for Kids Ages 2-5: Bold and Easy",
-        "prompt_file": "output/numbers_counting/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "summer_beach_fun": {
-        "name": "Summer Beach Fun",
-        "book_title": "Summer Beach Fun Coloring Book for Kids Ages 4-8: 50 Bold and Easy Beach Scenes with Sandcastles, Ocean Waves, and Summer Vacation Activities",
-        "prompt_file": "output/summer_beach_fun/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "halloween_cute_spooky": {
-        "name": "Halloween Cute & Spooky",
-        "book_title": "Halloween Cute & Spooky Coloring Book for Kids Ages 3-7: 50 Big and Simple Halloween Designs with Friendly Ghosts, Pumpkins, and Kawaii Creatures",
-        "prompt_file": "output/halloween_cute_spooky/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "summer_road_trip": {
-        "name": "Summer Road Trip Adventure",
-        "book_title": "Summer Road Trip Adventure Coloring Book for Kids Ages 4-8: 50 Bold and Easy Designs with Cars, Camping, Road Signs, and Vacation Fun",
-        "prompt_file": "output/summer_road_trip/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "4th_july_patriotic": {
-        "name": "4th of July Cute Patriotic",
-        "book_title": "4th of July Coloring Book for Kids Ages 3-7: 50 Big and Simple Patriotic Designs with Cute Eagles, Fireworks, and Stars",
-        "prompt_file": "output/4th_july_patriotic/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "sunflower_fields": {
-        "name": "Sunflower Fields",
-        "book_title": "Sunflower Fields Coloring Book: Beautiful Sunflowers, Farmhouse Scenes, and Golden Meadows with Bold and Easy Designs for Adults",
-        "prompt_file": "output/sunflower_fields/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "rose_garden": {
-        "name": "Rose Garden Collection",
-        "book_title": "Rose Garden Collection Coloring Book: Beautiful Roses, Romantic Blooms, and Cozy Garden Scenes with Bold and Easy Designs for Adults",
-        "prompt_file": "output/rose_garden/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "autumn_leaves_forest": {
-        "name": "Autumn Leaves & Forest",
-        "book_title": "Autumn Leaves & Forest Coloring Book: Cozy Fall Scenes with Bold and Easy Designs for Adults",
-        "prompt_file": "output/autumn_leaves_forest/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "herb_garden_kitchen": {
-        "name": "Herb Garden & Kitchen Herbs",
-        "book_title": "Herb Garden & Kitchen Herbs Coloring Book: Cute Kawaii Herbs with Cozy Cottagecore Scenes for Adults",
-        "prompt_file": "output/herb_garden_kitchen/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "cherry_blossom_garden": {
-        "name": "Japanese Cherry Blossom Garden",
-        "book_title": "Japanese Cherry Blossom Garden Coloring Book: Serene Temples, Torii Gates, and Sakura Scenes for Adults",
-        "prompt_file": "output/cherry_blossom_garden/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "tropical_botanical": {
-        "name": "Tropical Botanical Paradise",
-        "book_title": "Tropical Botanical Paradise Coloring Book: Lush Tropical Plants, Exotic Flowers, and Jungle Scenes with Bold and Easy Designs for Adults",
-        "prompt_file": "output/tropical_botanical/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "wildflower_meadow": {
-        "name": "Wildflower Meadow",
-        "book_title": "Wildflower Meadow Coloring Book: Beautiful Botanical Scenes with Bold and Easy Designs for Adults",
-        "prompt_file": "output/wildflower_meadow/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-    "lavender_dreams": {
-        "name": "Lavender Dreams",
-        "book_title": "Lavender Dreams Coloring Book: Provence Lavender Fields, Stone Cottages, and Cozy Garden Scenes with Bold and Easy Designs for Adults",
-        "prompt_file": "output/lavender_dreams/prompts.txt",
-        "page_size": "8.5x8.5",
-    },
-}
 
 # --- Paths ---
 OUTPUT_DIR = "output"
@@ -443,6 +197,111 @@ def get_cover_pdf_path(theme_key: str) -> str:
     """Return the cover PDF path: output/{theme_key}/cover.pdf"""
     return os.path.join(OUTPUT_DIR, theme_key, "cover.pdf")
 
+
+# --- Themes ---
+# Legacy themes only (no plan.json). All other themes are auto-loaded from output/{theme}/plan.json
+_LEGACY_THEMES = {
+    "cute_animals": {
+        "name": "Cute Animals",
+        "book_title": "Adorable Animals Coloring Book for Kids Ages 6-12",
+        "prompt_file": "prompts/cute_animals.txt",
+    },
+    "dinosaurs": {
+        "name": "Dinosaurs",
+        "book_title": "Amazing Dinosaurs Coloring Book for Kids Ages 6-12",
+        "prompt_file": "prompts/dinosaurs.txt",
+    },
+    "vehicles": {
+        "name": "Vehicles",
+        "book_title": "Cool Vehicles Coloring Book for Kids Ages 6-12",
+        "prompt_file": "prompts/vehicles.txt",
+    },
+    "unicorn_fantasy": {
+        "name": "Unicorn & Fantasy",
+        "book_title": "Magical Unicorns & Fantasy Coloring Book for Kids Ages 6-12",
+        "prompt_file": "prompts/unicorn_fantasy.txt",
+    },
+}
+
+
+def get_theme(theme_key: str) -> dict | None:
+    """Get theme config by key. Reads from plan.json first, falls back to _LEGACY_THEMES.
+
+    Returns dict with keys: name, book_title, prompt_file, and optionally page_size.
+    Returns None if theme not found.
+    """
+    # Try plan.json first
+    plan_path = get_plan_path(theme_key)
+    if os.path.exists(plan_path):
+        with open(plan_path) as f:
+            plan = json.load(f)
+        result = {
+            "name": plan.get("concept", theme_key),
+            "book_title": plan.get("title", theme_key),
+            "prompt_file": get_prompts_path(theme_key),
+        }
+        if plan.get("page_size"):
+            result["page_size"] = plan["page_size"]
+        return result
+
+    # Fall back to legacy themes
+    if theme_key in _LEGACY_THEMES:
+        return _LEGACY_THEMES[theme_key]
+
+    # Check if prompts.txt exists in output dir (theme without plan.json)
+    prompts_path = get_prompts_path(theme_key)
+    if os.path.exists(prompts_path):
+        return {
+            "name": theme_key.replace("_", " ").title(),
+            "book_title": theme_key.replace("_", " ").title(),
+            "prompt_file": prompts_path,
+        }
+
+    return None
+
+
+def list_themes() -> list[str]:
+    """List all available theme keys: legacy themes + output dirs with plan.json or prompts.txt."""
+    themes = set(_LEGACY_THEMES.keys())
+    if os.path.isdir(OUTPUT_DIR):
+        for d in os.listdir(OUTPUT_DIR):
+            theme_dir = os.path.join(OUTPUT_DIR, d)
+            if os.path.isdir(theme_dir):
+                if os.path.exists(os.path.join(theme_dir, "plan.json")) or \
+                   os.path.exists(os.path.join(theme_dir, "prompts.txt")):
+                    themes.add(d)
+    return sorted(themes)
+
+
+# Backward compatibility: THEMES dict-like object that loads dynamically
+class _ThemesProxy(dict):
+    """Proxy that loads themes dynamically from plan.json files."""
+
+    def __getitem__(self, key):
+        result = get_theme(key)
+        if result is None:
+            raise KeyError(key)
+        return result
+
+    def get(self, key, default=None):
+        result = get_theme(key)
+        return result if result is not None else default
+
+    def __contains__(self, key):
+        return get_theme(key) is not None
+
+    def keys(self):
+        return list_themes()
+
+    def __iter__(self):
+        return iter(list_themes())
+
+    def __len__(self):
+        return len(list_themes())
+
+
+THEMES = _ThemesProxy()
+
 # --- Base Prompt ---
 BASE_PROMPT = """Create a children's coloring book page in PORTRAIT orientation (taller than wide). Requirements:
 - PORTRAIT layout - the image must be taller than it is wide
@@ -455,6 +314,6 @@ BASE_PROMPT = """Create a children's coloring book page in PORTRAIT orientation 
 - Leave adequate spacing from edges
 - Style: cute, friendly, appealing to children
 - Single subject centered on page
-- NO borders, NO frames, NO rectangular boundary lines around the image
+- IMPORTANT: The illustration must NOT have any border, frame, or rectangular outline around the edges. The artwork should extend naturally with NO enclosing box or boundary line.
 
 Subject: {subject}"""

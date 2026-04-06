@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Shared image generation providers for KDP coloring book pipeline.
-Supports: AI33, Bimai, NanoPic.
+Supports: AI33, Bimai, NanoPic, Kie.ai.
 """
 from __future__ import annotations
 
@@ -220,8 +220,6 @@ def generate_image_nanopic(prompt: str, aspect_ratio: str = "1:1") -> Image.Imag
         print("Error: NANOPIC_API_KEY or NANOPIC_ACCESS_TOKEN not found in .env")
         sys.exit(1)
 
-    access_token = pool.next()
-
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -229,6 +227,9 @@ def generate_image_nanopic(prompt: str, aspect_ratio: str = "1:1") -> Image.Imag
     nanopic_ar = config.NANOPIC_ASPECT_RATIOS.get(aspect_ratio, "IMAGE_ASPECT_RATIO_SQUARE")
 
     for attempt in range(config.MAX_RETRIES):
+        # Rotate token on each attempt so a bad/expired token gets skipped
+        access_token = pool.next()
+        token_tail = access_token[-10:] if len(access_token) >= 10 else access_token
         try:
             payload = {
                 "accessToken": access_token,
@@ -240,6 +241,10 @@ def generate_image_nanopic(prompt: str, aspect_ratio: str = "1:1") -> Image.Imag
             resp = requests.post(config.NANOPIC_API_URL, headers=headers, json=payload)
             resp.raise_for_status()
             result = resp.json()
+
+            if not result.get("success"):
+                print(f"  NanoPic submit failed (token ...{token_tail}): {result}")
+                continue
 
             task_id = result.get("taskId") or result.get("data", {}).get("taskId")
             if not task_id:
@@ -265,24 +270,115 @@ def generate_image_nanopic(prompt: str, aspect_ratio: str = "1:1") -> Image.Imag
                 status_resp.raise_for_status()
                 status = status_resp.json()
 
-                if status.get("success") and status.get("data", {}).get("fifeUrl"):
-                    image_url = status["data"]["fifeUrl"]
+                code = status.get("code", "")
+                data = status.get("data") or {}
+
+                # Success: code=="success" and data.fifeUrl present
+                if code == "success" and data.get("fifeUrl"):
+                    image_url = data["fifeUrl"]
                     img_resp = requests.get(image_url)
                     img_resp.raise_for_status()
                     return Image.open(io.BytesIO(img_resp.content))
 
-                if status.get("code") == "error":
+                # Failure states
+                if code in ("error", "failed", "fail"):
                     error_msg = status.get("message", "Unknown error")
-                    print(f"  NanoPic error: {error_msg}")
+                    detail = data.get("error") or {}
+                    if detail:
+                        error_msg = f"{error_msg} ({detail.get('status', '')}: {detail.get('message', '')})"
+                    print(f"  NanoPic error (token ...{token_tail}): {error_msg}")
                     break
 
-                # code="processing" with success=false is normal — keep polling
-
+                # code="processing" / "pending" / empty — keep polling
                 if elapsed % 15 == 0:
-                    print(f"  Polling... status={status.get('code', 'pending')}")
+                    print(f"  Polling... status={code or 'pending'}")
 
             if elapsed >= config.NANOPIC_POLL_TIMEOUT:
                 print(f"  Timeout waiting for NanoPic task {task_id}")
+
+        except Exception as e:
+            print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
+            if attempt < config.MAX_RETRIES - 1:
+                time.sleep(config.REQUEST_DELAY_SECONDS)
+
+    return None
+
+
+def generate_image_kie(prompt: str, aspect_ratio: str = "3:4") -> Image.Image | None:
+    """Generate an image using Kie.ai API."""
+    api_key = os.getenv("KIE_API_KEY")
+    if not api_key:
+        print("Error: KIE_API_KEY not found in .env")
+        sys.exit(1)
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": config.KIE_MODEL,
+        "input": {
+            "prompt": prompt,
+            "image_input": [],
+            "aspect_ratio": aspect_ratio,
+            "resolution": config.KIE_RESOLUTION,
+            "output_format": "png",
+        },
+    }
+
+    for attempt in range(config.MAX_RETRIES):
+        try:
+            resp = requests.post(config.KIE_API_URL, headers=headers, json=payload)
+            resp.raise_for_status()
+            result = resp.json()
+
+            if result.get("code") != 200:
+                print(f"  Kie.ai submit failed (attempt {attempt + 1}): {result.get('msg', result)}")
+                continue
+
+            task_id = result.get("data", {}).get("taskId")
+            if not task_id:
+                print(f"  Kie.ai submit failed (attempt {attempt + 1}): no taskId in {result}")
+                continue
+
+            print(f"  Kie.ai task submitted: {task_id}")
+
+            elapsed = 0
+            while elapsed < config.KIE_POLL_TIMEOUT:
+                time.sleep(config.KIE_POLL_INTERVAL)
+                elapsed += config.KIE_POLL_INTERVAL
+
+                status_resp = requests.get(
+                    f"{config.KIE_STATUS_URL}?taskId={task_id}",
+                    headers=headers,
+                )
+                status_resp.raise_for_status()
+                status = status_resp.json()
+                task_data = status.get("data", {})
+                task_state = task_data.get("state", "")
+
+                if task_state == "success":
+                    result_json_str = task_data.get("resultJson", "")
+                    if result_json_str:
+                        result_json = json.loads(result_json_str)
+                        urls = result_json.get("resultUrls", [])
+                        if urls:
+                            img_resp = requests.get(urls[0])
+                            img_resp.raise_for_status()
+                            return Image.open(io.BytesIO(img_resp.content))
+                    print("  Warning: Kie.ai task succeeded but no result URLs")
+                    break
+
+                elif task_state == "failed":
+                    fail_msg = task_data.get("failMsg", "Unknown error")
+                    print(f"  Kie.ai error: {fail_msg}")
+                    break
+                else:
+                    if elapsed % 15 == 0:
+                        print(f"  Polling... state={task_state}")
+
+            if elapsed >= config.KIE_POLL_TIMEOUT:
+                print(f"  Timeout waiting for Kie.ai task {task_id}")
 
         except Exception as e:
             print(f"  Error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
@@ -298,6 +394,7 @@ RENDERERS = {
     "ai33": generate_image_ai33,
     "bimai": generate_image_bimai,
     "nanopic": generate_image_nanopic,
+    "kie": generate_image_kie,
 }
 
 RENDERER_CHOICES = list(RENDERERS.keys())
@@ -334,5 +431,4 @@ def generate_image(
 
     if renderer == "bimai":
         return fn(prompt, aspect_ratio=aspect_ratio, resolution=resolution)
-    else:
-        return fn(prompt, aspect_ratio=aspect_ratio)
+    return fn(prompt, aspect_ratio=aspect_ratio)

@@ -1,0 +1,6 @@
+
+export DISCORD_BOT_TOKEN="MTQ4NzQ3MDg2NTc2MjM1MzE1Mg.GKeZd2.8M5SCFri_R3Noom1x401zxrqVdZU_8MH99Lako"
+openclaw config set channels.discord.token --ref-provider default --ref-source env --ref-id DISCORD_BOT_TOKEN --dry-run
+openclaw config set channels.discord.token --ref-provider default --ref-source env --ref-id DISCORD_BOT_TOKEN
+openclaw config set channels.discord.enabled true --strict-json
+openclaw gateway

@@ -6,17 +6,20 @@ Uses AI33 API to generate front cover artwork, then composites with text.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import sys
 import time
+
+import requests
 
 from dotenv import load_dotenv
 
 from PIL import Image, ImageDraw, ImageFont
 
 import config
-from image_providers import generate_image, RENDERER_CHOICES, DEFAULT_RENDERER
+from image_providers import generate_image, RENDERER_CHOICES, DEFAULT_RENDERER, get_nanopic_pool
 
 load_dotenv()
 
@@ -37,14 +40,16 @@ def calculate_cover_dimensions(total_pages: int, trim_w: float = TRIM_WIDTH, tri
     full_width = (2 * trim_w) + spine_width + (2 * BLEED_INCHES)
     full_height = trim_h + (2 * BLEED_INCHES)
 
-    full_width_px = int(full_width * config.DPI)
-    full_height_px = int(full_height * config.DPI)
+    # Use round() to avoid truncation — int() can make cover 1-2 px too small,
+    # which KDP flags as insufficient bleed.
+    bleed_px = round(BLEED_INCHES * config.DPI)
+    trim_w_px = round(trim_w * config.DPI)
+    spine_w_px = round(spine_width * config.DPI)
+    safe_px = round(SAFE_MARGIN * config.DPI)
 
-    # Regions in pixels (from left to right)
-    bleed_px = int(BLEED_INCHES * config.DPI)
-    trim_w_px = int(trim_w * config.DPI)
-    spine_w_px = int(spine_width * config.DPI)
-    safe_px = int(SAFE_MARGIN * config.DPI)
+    # Derive full dimensions from components to avoid rounding mismatch
+    full_width_px = 2 * bleed_px + 2 * trim_w_px + spine_w_px
+    full_height_px = 2 * bleed_px + round(trim_h * config.DPI)
 
     return {
         "total_pages": total_pages,
@@ -81,9 +86,14 @@ def count_pages(theme: str) -> int:
     return total
 
 
-def generate_front_artwork(theme: str, title: str = "", renderer: str = DEFAULT_RENDERER, size: str = config.DEFAULT_PAGE_SIZE) -> Image.Image | None:
+def generate_front_artwork(theme: str, title: str = "", author: str = "", renderer: str = DEFAULT_RENDERER, size: str = config.DEFAULT_PAGE_SIZE) -> Image.Image | None:
     """Generate front cover artwork using the selected renderer."""
     theme_config = config.THEMES[theme]
+
+    # Build author text instruction
+    author_instruction = ""
+    if author:
+        author_instruction = f' Above the title, include the author name "{author}" in a smaller, elegant font as part of the design.'
 
     # Try to load cover_prompt from plan file
     plan_path = config.get_plan_path(theme)
@@ -96,7 +106,7 @@ def generate_front_artwork(theme: str, title: str = "", renderer: str = DEFAULT_
     if cover_prompt_from_plan:
         prompt = cover_prompt_from_plan
         prompt = prompt.replace("DO NOT include any text, letters, or words in the generated image.", "")
-        prompt += f'\n\nIMPORTANT: Include the book title "{title}" as beautiful, large, decorative text integrated into the artwork at the top of the image. The title text should be stylish, readable, and part of the cover design. Do NOT include any placeholder text, subtitle text, or extra text besides the title.'
+        prompt += f'\n\nIMPORTANT: Include the book title "{title}" as beautiful, large, decorative text integrated into the artwork at the top of the image. The title text should be stylish, readable, and part of the cover design.{author_instruction} Do NOT include any placeholder text, subtitle text, or extra text besides the title and author name.'
     else:
         theme_subjects = {
             "cute_animals": "a cute cat, puppy, and bunny playing together in a colorful flower garden with butterflies",
@@ -110,7 +120,7 @@ Theme: {theme_config['name']}
 Title: {title}
 Style: Bright, cheerful, eye-catching, cartoon style, professional book cover art.
 The image should feature {subject}.
-IMPORTANT: Include the book title "{title}" as beautiful, large, decorative text integrated into the artwork at the top. The title should be stylish, readable, and part of the cover design. Do NOT include any placeholder text, subtitle text, or extra text besides the title.
+IMPORTANT: Include the book title "{title}" as beautiful, large, decorative text integrated into the artwork at the top. The title should be stylish, readable, and part of the cover design.{author_instruction} Do NOT include any placeholder text, subtitle text, or extra text besides the title and author name.
 The artwork should be high quality, detailed, and appealing.
 Use a clean, attractive background with vibrant colors."""
 
@@ -120,11 +130,111 @@ Use a clean, attractive background with vibrant colors."""
     return generate_image(prompt, renderer=renderer, aspect_ratio=ar)
 
 
-def colorize_page(image_path: str, renderer: str = "ai33") -> Image.Image | None:
-    """Colorize a line art coloring page. AI33 is text-to-image only, cannot colorize."""
-    # AI33 is text-to-image only, cannot colorize existing images
-    # Return None to fall back to using original line art
-    return None
+def colorize_page(image_path: str, renderer: str = DEFAULT_RENDERER) -> Image.Image | None:
+    """Colorize a line art coloring page using NanoPic image-to-image (sends original image as base64)."""
+    import base64
+
+    basename = os.path.basename(image_path)
+
+    try:
+        api_key = os.getenv("NANOPIC_API_KEY")
+        pool = get_nanopic_pool()
+        if not api_key or pool.size == 0:
+            print(f"  Warning: NANOPIC keys not found, skipping colorize for {basename}")
+            return None
+
+        # Read original image and convert to base64
+        with open(image_path, "rb") as f:
+            image_data = f.read()
+        b64_image = f"data:image/png;base64,{base64.b64encode(image_data).decode()}"
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        prompt = (
+            "Colorize this black and white coloring page with vibrant, cheerful colors. "
+            "Fill all white areas with appropriate solid colors. Keep the black outlines intact. "
+            "Use a warm, inviting color palette. Make it look professionally colored."
+        )
+
+        print(f"  Colorizing {basename} via NanoPic image-to-image...")
+
+        for attempt in range(config.MAX_RETRIES):
+            access_token = pool.next()
+            try:
+                payload = {
+                    "accessToken": access_token,
+                    "promptText": prompt,
+                    "imageUrls": [b64_image],
+                    "aspectRatio": "IMAGE_ASPECT_RATIO_SQUARE",
+                    "imageModel": config.NANOPIC_MODEL,
+                }
+                resp = requests.post(config.NANOPIC_API_URL, headers=headers, json=payload)
+                resp.raise_for_status()
+                result = resp.json()
+
+                if not result.get("success"):
+                    print(f"  NanoPic colorize submit failed (attempt {attempt + 1}): {result}")
+                    continue
+
+                task_id = result.get("taskId") or result.get("data", {}).get("taskId")
+                if not task_id:
+                    for key in result:
+                        if "task" in key.lower() and isinstance(result[key], str):
+                            task_id = result[key]
+                            break
+                if not task_id:
+                    print(f"  NanoPic colorize: no taskId in response")
+                    continue
+
+                print(f"  NanoPic colorize task: {task_id}")
+
+                elapsed = 0
+                while elapsed < config.NANOPIC_POLL_TIMEOUT:
+                    time.sleep(config.NANOPIC_POLL_INTERVAL)
+                    elapsed += config.NANOPIC_POLL_INTERVAL
+
+                    status_resp = requests.get(
+                        f"{config.NANOPIC_STATUS_URL}?taskId={task_id}",
+                        headers=headers,
+                    )
+                    status_resp.raise_for_status()
+                    status = status_resp.json()
+                    code = status.get("code", "")
+                    data = status.get("data") or {}
+
+                    if code == "success" and data.get("fifeUrl"):
+                        img_resp = requests.get(data["fifeUrl"])
+                        img_resp.raise_for_status()
+                        img = Image.open(io.BytesIO(img_resp.content)).convert("RGB")
+                        print(f"  Colorized successfully: {basename}")
+                        return img
+
+                    if code in ("error", "failed", "fail"):
+                        error_msg = status.get("message", "Unknown error")
+                        detail = data.get("error") or {}
+                        if detail:
+                            error_msg = f"{error_msg} ({detail.get('status', '')}: {detail.get('message', '')})"
+                        print(f"  NanoPic colorize error: {error_msg}")
+                        break
+
+                    if elapsed % 15 == 0:
+                        print(f"  Polling... status={code or 'pending'}")
+
+                if elapsed >= config.NANOPIC_POLL_TIMEOUT:
+                    print(f"  Timeout waiting for NanoPic colorize task {task_id}")
+
+            except Exception as e:
+                print(f"  Colorize error (attempt {attempt + 1}/{config.MAX_RETRIES}): {e}")
+                if attempt < config.MAX_RETRIES - 1:
+                    time.sleep(config.REQUEST_DELAY_SECONDS)
+
+        return None
+    except Exception as e:
+        print(f"  Warning: Colorize failed for {basename}: {e}")
+        return None
 
 
 def get_sample_pages(theme: str, count: int = 6) -> list[str]:
@@ -135,11 +245,7 @@ def get_sample_pages(theme: str, count: int = 6) -> list[str]:
         for f in os.listdir(image_dir)
         if f.endswith(".png")
     ])
-    if len(pages) <= count:
-        return pages
-    # Pick evenly spaced pages
-    step = len(pages) / count
-    return [pages[int(i * step)] for i in range(count)]
+    return pages[:count]
 
 
 def get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
@@ -197,6 +303,7 @@ def build_cover(
     kdp_height: float | None = None,
     size: str = config.DEFAULT_PAGE_SIZE,
     renderer: str = DEFAULT_RENDERER,
+    regenerate_artwork: bool = False,
 ):
     """Build the complete cover image."""
     theme_config = config.THEMES.get(theme)
@@ -245,13 +352,16 @@ def build_cover(
         trim_w_px = round(trim_w * config.DPI)
         spine_w_px = round(spine_width * config.DPI)
         safe_px = round(SAFE_MARGIN * config.DPI)
+        # Derive full px from components so regions tile without gaps
+        full_w_px = 2 * bleed_px + 2 * trim_w_px + spine_w_px
+        full_h_px = 2 * bleed_px + round(trim_h * config.DPI)
         dims = {
             "total_pages": total_pages,
             "spine_width_inches": spine_width,
             "full_width_inches": kdp_width,
             "full_height_inches": kdp_height,
-            "full_width_px": round(kdp_width * config.DPI),
-            "full_height_px": round(kdp_height * config.DPI),
+            "full_width_px": full_w_px,
+            "full_height_px": full_h_px,
             "bleed_px": bleed_px,
             "trim_w_px": trim_w_px,
             "spine_w_px": spine_w_px,
@@ -269,19 +379,37 @@ def build_cover(
     print(f"Title: {title}")
     print(f"Pages: {dims['total_pages']}")
     print(f"Spine: {dims['spine_width_inches']:.3f}\"")
-    print(f"Cover: {dims['full_width_inches']:.3f}\" x {dims['full_height_inches']:.3f}\"")
-    print(f"Pixels: {dims['full_width_px']} x {dims['full_height_px']}")
+    print(f"Trim:  {trim_w}\" x {trim_h}\"  |  Bleed: {BLEED_INCHES}\" each side")
+    print(f"Cover: {dims['full_width_inches']:.3f}\" x {dims['full_height_inches']:.3f}\" (with bleed)")
+    print(f"Pixels: {dims['full_width_px']} x {dims['full_height_px']} @ {config.DPI} DPI")
     print()
+
+    # Ensure book directory exists
+    book_dir = config.get_book_dir(theme)
+    os.makedirs(book_dir, exist_ok=True)
 
     # Create full cover canvas (white background)
     cover = Image.new("RGB", (dims["full_width_px"], dims["full_height_px"]), (255, 255, 255))
     draw = ImageDraw.Draw(cover)
 
     # --- Generate and place front cover artwork ---
-    artwork = generate_front_artwork(theme, title, renderer=renderer, size=size)
+    front_artwork_path = os.path.join(book_dir, "front_artwork.png")
+    artwork = None
+
+    # Reuse saved front artwork if available (unless regenerate requested)
+    if not regenerate_artwork and os.path.exists(front_artwork_path):
+        print(f"Reusing saved front artwork: {front_artwork_path}")
+        artwork = Image.open(front_artwork_path)
+    else:
+        artwork = generate_front_artwork(theme, title, author=author, renderer=renderer, size=size)
+        if artwork:
+            # Save front artwork for future reuse
+            artwork.save(front_artwork_path, "PNG", dpi=(config.DPI, config.DPI))
+            print(f"Front artwork saved: {front_artwork_path}")
+
     if artwork:
-        # Resize artwork to fit front cover area
-        front_w = dims["trim_w_px"]
+        # Resize artwork to fit front cover area (including right bleed)
+        front_w = dims["full_width_px"] - dims["front_start_x"]
         front_h = dims["full_height_px"]
         artwork = artwork.convert("RGB")
         artwork = artwork.resize((front_w, front_h), Image.Resampling.LANCZOS)
@@ -327,42 +455,7 @@ def build_cover(
         fill=spine_color,
     )
 
-    # --- Add bottom gradient overlay on front cover for subtitle/author ---
-    front_x = dims["front_start_x"]
-    front_w = dims["trim_w_px"]
-    full_h = dims["full_height_px"]
-
-    bottom_h = full_h // 5
-    bottom_overlay = Image.new("RGBA", (front_w, bottom_h), (0, 0, 0, 0))
-    bottom_draw = ImageDraw.Draw(bottom_overlay)
-    for y in range(bottom_h):
-        alpha = int(200 * (y / bottom_h))  # Fade from transparent to dark
-        bottom_draw.line([(0, y), (front_w, y)], fill=(0, 0, 0, alpha))
-    front_region = cover.crop((front_x, full_h - bottom_h, front_x + front_w, full_h)).convert("RGBA")
-    front_region = Image.alpha_composite(front_region, bottom_overlay)
-    cover.paste(front_region.convert("RGB"), (front_x, full_h - bottom_h))
-
-    # Refresh draw after overlay
-    draw = ImageDraw.Draw(cover)
-
-    # --- Add author name only to Front Cover (title + subtitle are in artwork) ---
-    front_center_x = dims["front_start_x"] + dims["trim_w_px"] // 2
-    safe = dims["safe_px"]
-
-    if author:
-        author_font = get_font(44, bold=False)
-        bbox = draw.textbbox((0, 0), author, font=author_font)
-        auth_w = bbox[2] - bbox[0]
-        auth_y = dims["full_height_px"] - dims["bleed_px"] - safe - 80
-        draw_text_with_outline(
-            draw,
-            (front_center_x - auth_w // 2, auth_y),
-            author,
-            author_font,
-            fill="white",
-            outline_color=(30, 30, 30),
-            outline_width=4,
-        )
+    # Author name is now included in the AI-generated front artwork via prompt
 
     # --- Back cover: sample pages grid + text ---
     back_center_x = dims["bleed_px"] + dims["trim_w_px"] // 2
@@ -370,9 +463,14 @@ def build_cover(
     back_title_font = get_font(44, bold=True)
     safe = dims["safe_px"]
 
-    # Back title
+    # Back title — truncate to fit within back cover width
+    back_max_w = dims["trim_w_px"] - 2 * safe - 40  # leave padding
     back_title = f"{config.THEMES[theme]['name']}"
+    # Truncate title if too long
     bbox = draw.textbbox((0, 0), back_title, font=back_title_font)
+    while bbox[2] - bbox[0] > back_max_w and len(back_title) > 10:
+        back_title = back_title[:len(back_title) - 4].rstrip() + "..."
+        bbox = draw.textbbox((0, 0), back_title, font=back_title_font)
     bt_w = bbox[2] - bbox[0]
     title_y = dims["bleed_px"] + safe + 60
     draw.text(
@@ -407,7 +505,11 @@ def build_cover(
     ]
     desc_y = title_y + 70
     for line in back_desc_lines:
+        # Truncate each line to fit
         bbox = draw.textbbox((0, 0), line, font=desc_font)
+        while bbox[2] - bbox[0] > back_max_w and len(line) > 10:
+            line = line[:len(line) - 4].rstrip() + "..."
+            bbox = draw.textbbox((0, 0), line, font=desc_font)
         line_w = bbox[2] - bbox[0]
         draw.text(
             (back_center_x - line_w // 2, desc_y),
@@ -574,9 +676,14 @@ def main():
         default=DEFAULT_RENDERER,
         help=f"Image renderer (default: {DEFAULT_RENDERER} from .env)",
     )
+    parser.add_argument(
+        "--regenerate",
+        action="store_true",
+        help="Force regenerate front artwork even if saved version exists",
+    )
     args = parser.parse_args()
 
-    build_cover(args.theme, args.author, args.title, args.kdp_width, args.kdp_height, args.size, args.renderer)
+    build_cover(args.theme, args.author, args.title, args.kdp_width, args.kdp_height, args.size, args.renderer, args.regenerate)
 
 
 if __name__ == "__main__":

@@ -65,7 +65,7 @@ You are creating a complete KDP coloring book plan for ONE book idea. Write ever
 - Style: {style}
 - Page size: {page_size}
 - Number of pages: {page_count}
-- Theme key: {theme_key} (derived from idea filename, e.g., "19_lavender_dreams" → "lavender_dreams")
+- Theme key: {theme_key} (derived from idea filename: strip ONLY the leading number prefix and its underscore, e.g., "19_lavender_dreams" → "lavender_dreams", "05_4th_july_patriotic" → "4th_july_patriotic")
 - Author: {author_first_name} {author_last_name}
 - Key themes from research: {key_themes}
 
@@ -87,10 +87,10 @@ You are creating a complete KDP coloring book plan for ONE book idea. Write ever
 3. Write {page_count} page prompts following these rules:
 
    **For Adults:**
-   - Start each prompt with: "Black and white line art illustration for an adult coloring book, cute cozy cottagecore aesthetic, medium detail, bold clean outlines, large open shapes for easy coloring, no shading. NO borders, NO frames, NO rectangular boundary lines around the image. White background. {SIZE_TAG}."
+   - Start each prompt with: "Black and white line art illustration for an adult coloring book, {style} aesthetic, medium detail, bold clean outlines, large open shapes for easy coloring, no shading. NO borders, NO frames, NO rectangular boundary lines around the image. White background. {SIZE_TAG}."
    - SIZE_TAG: "SQUARE format (1:1 aspect ratio)" for 8.5x8.5, "PORTRAIT orientation (3:4 aspect ratio)" for 8.5x11
    - Structure each prompt with Scene, Foreground, Midground, Background sections
-   - End with: "Clean bold outlines, cozy relaxing cottagecore environment, easy-to-color shapes, adult coloring book page. NO borders or frames."
+   - End with: "Clean bold outlines, {style} environment, easy-to-color shapes, adult coloring book page. NO borders or frames."
    - Large stylized shapes, NO dense micro-patterns, NO small clusters
    - Minimize characters per scene. If 2+ characters, add: "IMPORTANT: Each character must have clearly defined, complete body with no overlapping or merged body parts"
    - Prefer pet companions over second human characters
@@ -115,13 +115,14 @@ You are creating a complete KDP coloring book plan for ONE book idea. Write ever
      "subtitle": "",
      "description": "",
      "keywords": [],
+     "author": {"first_name": "{author_first_name}", "last_name": "{author_last_name}"},
      "cover_prompt": "...",
      "page_prompts": [...]
    }
    Leave title, subtitle, description, keywords EMPTY — Phase 3 fills them.
 
 7. Save prompts to output/{theme_key}/prompts.txt (one per line)
-8. Register theme in config.py THEMES dict (read config.py first to see existing format)
+8. Do NOT register theme in config.py — the orchestrator will do this after all agents complete to avoid race conditions
 
 **PHASE 3: Generate SEO Book Detail**
 
@@ -153,10 +154,9 @@ You are creating a complete KDP coloring book plan for ONE book idea. Write ever
 2. Verify output/{theme_key}/bookinfo.md exists (created by kdp-book-detail skill in Phase 3).
    If missing, invoke the skill again: skill: "kdp-book-detail", args: "Plan: output/{theme_key}/plan.json, Author: {author_first_name} {author_last_name}, Audience: {audience}"
 
-3. Move the idea file to ideas/done/:
-   Run: mv ideas/{idea_filename} ideas/done/{idea_filename}
+3. Do NOT move the idea file to ideas/done/ — the orchestrator will move it after user approval in Step 4.
 
-Return a summary: theme_key, title, subtitle, page count, and 2 sample prompts.
+Return a summary: theme_key, title, subtitle, page count, idea_filename, and 2 sample prompts.
 ```
 
 **IMPORTANT**: Launch ALL idea agents in a SINGLE message with multiple Agent tool calls for maximum parallelism.
@@ -186,6 +186,11 @@ After ALL agents complete, for EACH completed plan:
 4. Ask user: "Approve all plans? Or specify which ones need changes?"
 
 5. If changes needed, edit the specific plan.json directly.
+
+6. **After user approves**, for each approved plan:
+   a. Register theme in config.py THEMES dict (read config.py first to see existing format, write all themes in one edit to avoid conflicts)
+   b. Move the idea file to ideas/done/: `mv ideas/{idea_filename} ideas/done/{idea_filename}`
+   c. Do NOT move ideas that were rejected or need rework
 
 ---
 

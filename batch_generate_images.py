@@ -113,7 +113,18 @@ def scan_book(book_dir: str) -> BookScanResult | None:
         existing_pages=0,
     )
 
-    for idx, prompt in enumerate(page_prompts):
+    for idx, raw_prompt in enumerate(page_prompts):
+        # Normalize: some plan.json files store page_prompts as list of dicts
+        # (e.g. {"page": 1, "prompt": "..."}) instead of plain strings.
+        if isinstance(raw_prompt, dict):
+            prompt = raw_prompt.get("prompt") or raw_prompt.get("text") or ""
+        else:
+            prompt = str(raw_prompt)
+
+        if not prompt.strip():
+            log.warning("Skipping %s page %d: empty prompt", theme_key, idx + 1)
+            continue
+
         page_num = idx + 1
         filename = f"page_{page_num:02d}.png"
         filepath = os.path.join(images_dir, filename)
@@ -352,15 +363,17 @@ def main():
                 success, message = future.result()
                 if success:
                     success_count += 1
-                    log.info("[%d/%d] %s", completed, total, message)
+                    log.info("✅ [%d/%d success | %d/%d done] %s",
+                             success_count, total, completed, total, message)
                 else:
                     fail_count += 1
-                    log.warning("[%d/%d] %s", completed, total, message)
+                    log.warning("❌ [%d/%d success | %d/%d done] %s",
+                                success_count, total, completed, total, message)
             except Exception as e:
                 fail_count += 1
                 log.error(
-                    "[%d/%d] [EXCEPTION] %s/page_%02d: %s",
-                    completed, total, task.theme_key, task.page_num, e,
+                    "❌ [%d/%d success | %d/%d done] [EXCEPTION] %s/page_%02d: %s",
+                    success_count, total, completed, total, task.theme_key, task.page_num, e,
                 )
 
     finally:

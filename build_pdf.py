@@ -12,6 +12,8 @@ import sys
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
 import config
@@ -118,7 +120,15 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None,
     os.makedirs(book_dir, exist_ok=True)
     output_path = config.get_interior_pdf_path(theme)
 
+    # Register embeddable TTF fonts (KDP requires all fonts fully embedded)
+    pdfmetrics.registerFont(TTFont('Arial', '/System/Library/Fonts/Supplemental/Arial.ttf'))
+    pdfmetrics.registerFont(TTFont('Arial-Bold', '/System/Library/Fonts/Supplemental/Arial Bold.ttf'))
+    pdfmetrics.registerFont(TTFont('Arial-Italic', '/System/Library/Fonts/Supplemental/Arial Italic.ttf'))
+    # Override Helvetica so ReportLab's default font is also embedded
+    pdfmetrics.registerFont(TTFont('Helvetica', '/System/Library/Fonts/Supplemental/Arial.ttf'))
+
     c = canvas.Canvas(output_path, pagesize=(page_w, page_h))
+    c.setFont("Arial", 12)  # Override default Helvetica
 
     # Helper: get content area for a given page number (1-based)
     # Odd pages (right-hand): gutter on LEFT, outside on RIGHT
@@ -144,28 +154,46 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None,
     cx, cy, cw, ch = _content_area(page_num)
     center_x = cx + cw / 2
 
-    c.setFont("Helvetica-Bold", 36)
-    title_lines = _wrap_text(title, max_chars=25)
-    y_start = page_h * 0.55
-    for i, line in enumerate(title_lines):
-        c.drawCentredString(center_x, y_start - (i * 45), line)
+    # Auto-scale title font until it fits in max 4 lines
+    title_font_size = 36
+    title_max_chars = 25
+    title_lines = _wrap_text(title, max_chars=title_max_chars)
+    while len(title_lines) > 4 and title_font_size > 18:
+        title_font_size -= 2
+        title_max_chars += 5
+        title_lines = _wrap_text(title, max_chars=title_max_chars)
+    title_line_spacing = title_font_size * 1.3
 
-    c.setFont("Helvetica", 16)
-    subtitle_lines = _wrap_text(subtitle, max_chars=45)
-    y_sub = page_h * 0.35
+    # Draw title block centered vertically in upper half of page
+    c.setFont("Arial-Bold", title_font_size)
+    title_block_height = (len(title_lines) - 1) * title_line_spacing
+    title_top = page_h * 0.72  # start from upper area
+    title_bottom = title_top - title_block_height  # actual bottom of title block
+    for i, line in enumerate(title_lines):
+        c.drawCentredString(center_x, title_top - (i * title_line_spacing), line)
+
+    # Subtitle: always placed below title block with fixed gap
+    GAP = 28
+    y_sub = title_bottom - GAP
+    c.setFont("Arial", 16)
+    subtitle_lines = _wrap_text(subtitle, max_chars=48)
     for i, line in enumerate(subtitle_lines):
         c.drawCentredString(center_x, y_sub - (i * 22), line)
+    y_after_sub = y_sub - (len(subtitle_lines) - 1) * 22
 
-    c.setFont("Helvetica-Oblique", 14)
+    # Design label
+    y_label = y_after_sub - GAP
+    c.setFont("Arial-Italic", 13)
     if audience == "adults":
-        c.drawCentredString(center_x, page_h * 0.25, "Cozy & Relaxing Designs")
+        c.drawCentredString(center_x, y_label, "Cozy & Relaxing Designs")
     else:
-        c.drawCentredString(center_x, page_h * 0.25, "Bold & Easy Designs")
+        c.drawCentredString(center_x, y_label, "Bold & Easy Designs")
 
-    # Author name on title page (KDP metadata consistency requirement)
+    # Author name — always below label with fixed gap
     if author:
-        c.setFont("Helvetica", 14)
-        c.drawCentredString(center_x, page_h * 0.18, f"by {author}")
+        y_author = y_label - GAP
+        c.setFont("Arial", 13)
+        c.drawCentredString(center_x, y_author, f"by {author}")
     c.showPage()
 
     # --- Page 2: Copyright / Info Page ---
@@ -174,7 +202,7 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None,
     center_x = cx + cw / 2
 
     current_year = datetime.datetime.now().year
-    c.setFont("Helvetica", 11)
+    c.setFont("Arial", 11)
     author_line = f"Copyright (c) {current_year} {author}. All rights reserved." if author else f"Copyright (c) {current_year}. All rights reserved."
     if audience == "adults":
         copyright_lines = [
@@ -245,11 +273,11 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None,
     cx, cy, cw, ch = _content_area(page_num)
     center_x = cx + cw / 2
 
-    c.setFont("Helvetica-Bold", 28)
+    c.setFont("Arial-Bold", 28)
     c.drawCentredString(center_x, page_h * 0.55, "Thank You!")
-    c.setFont("Helvetica", 16)
+    c.setFont("Arial", 16)
     c.drawCentredString(center_x, page_h * 0.45, "We hope you enjoyed coloring!")
-    c.setFont("Helvetica", 14)
+    c.setFont("Arial", 14)
     c.drawCentredString(
         center_x, page_h * 0.38, "If you liked this book, please leave a review."
     )
