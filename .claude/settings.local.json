@@ -44,7 +44,9 @@
       "Bash(python build_pdf.py --theme airplanes_helicopters)",
       "Bash(python generate_cover.py --theme airplanes_helicopters --renderer nanopic)",
       "Bash(python build_pdf.py --theme 4th_july_patriotic)",
-      "Bash(python generate_cover.py --theme 4th_july_patriotic --renderer nanopic)"
+      "Bash(python generate_cover.py --theme 4th_july_patriotic --renderer nanopic)",
+      "Skill(kdp-create-book)",
+      "Skill(kdp-create-book:*)"
     ],
     "deny": [],
     "ask": []
