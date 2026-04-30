@@ -30,8 +30,41 @@ def get_client():
     return genai.Client(api_key=api_key)
 
 
-def build_prompt(concept: str, audience: str, pages: int) -> str:
-    """Build the super prompt for Gemini based on audience type."""
+def build_prompt(concept: str, audience: str, pages: int, style: str = "") -> str:
+    """Build the super prompt for Gemini based on audience type and style."""
+    if style == "anime manga action" or audience == "anime":
+        return f"""Generate a complete anime/manga style coloring book package based on the concept below. Output text only, no images.
+Concept: {concept}
+Number of coloring pages: {pages}
+
+Every page prompt MUST follow these strict rules:
+
+STYLE: Black and white line art, anime manga style, clean bold outlines only, pure white background, PORTRAIT orientation (3:4 aspect ratio).
+
+CRITICAL RULES FOR EVERY PROMPT:
+- Maximum 2-3 characters per scene. NEVER crowds, armies, or groups larger than 3.
+- ALL dark or shadowy areas MUST use outline hatching lines — NEVER solid black fills.
+- NO silhouettes anywhere. Every figure must have interior outline detail.
+- Hair: always describe as "hair drawn with outline strokes" NOT solid black.
+- Set scenes in daylight or neutral light — avoid "dark night" or "black sky".
+- Night scenes: write "moonlit sky with visible stars" not "dark night scene".
+- Forest/trees: "bamboo stalks as thin outline lines" not dense filled foliage.
+- Action effects (fire/water/lightning): always "stylized outline pattern effects".
+- Do NOT use the phrase "coloring book page" — use "line art illustration" instead.
+- Every prompt must end with: "NO solid black fills anywhere. NO silhouettes. NO borders or frames. NOT a photograph. NOT a photo of a book. NO book spine. NO page shadows. NO gray background. Pure white background only."
+
+SCENE VARIETY: Include a mix of — character portraits, solo action poses, 1-on-1 duels, technique effects, Japanese landscape settings, creature/demon designs, training scenes.
+
+Output format (respond ONLY with this JSON, no other text):
+{{
+  "title": "catchy SEO-friendly title for anime coloring book",
+  "subtitle": "descriptive subtitle",
+  "description": "3-5 sentence commercial description for Amazon KDP targeting anime/manga fans",
+  "keywords": ["keyword1", "keyword2", ... 7 keywords],
+  "cover_prompt": "full-color vibrant anime-style cover illustration, rich saturated colors, dynamic pose, NO text in image",
+  "page_prompts": ["prompt1", "prompt2", ... {pages} prompts following ALL rules above]
+}}"""
+
     if audience == "adults":
         return f"""Generate a complete adult-friendly coloring book package based on the concept below, but do not generate any images; output text only.
 Concept: {concept}
@@ -109,6 +142,12 @@ def main():
         help="Target audience (default: kids)",
     )
     parser.add_argument(
+        "--style",
+        default="",
+        choices=["", "cute cozy kawaii", "bold and easy", "anime manga action"],
+        help="Art style override (default: auto based on audience)",
+    )
+    parser.add_argument(
         "--pages",
         type=int,
         default=30,
@@ -129,13 +168,14 @@ def main():
     print(f"Planning coloring book...")
     print(f"  Concept:  {args.concept}")
     print(f"  Audience: {args.audience}")
+    print(f"  Style:    {args.style or 'auto'}")
     print(f"  Pages:    {args.pages}")
     print(f"  Theme key: {args.theme_key}")
     print()
 
     # Build prompt and call Gemini
     client = get_client()
-    prompt = build_prompt(args.concept, args.audience, args.pages)
+    prompt = build_prompt(args.concept, args.audience, args.pages, args.style)
 
     print("Calling Gemini API for book plan (text only)...")
     try:

@@ -24,7 +24,7 @@ You receive a JSON object:
 | audience | no | adults | `adults` or `kids` |
 | page_size | no | 8.5x11 | `8.5x11` (portrait) or `8.5x8.5` (square) |
 | page_count | no | 30 | 20-50 |
-| style | no | auto | Adults: "cute cozy kawaii" / Kids: "bold and easy" |
+| style | no | auto | Adults: "cute cozy kawaii" / Kids: "bold and easy" / Anime: "anime manga action" |
 
 ---
 
@@ -122,6 +122,44 @@ Clean bold outlines, {style} environment, easy-to-color shapes, adult coloring b
 
 ---
 
+## Page Prompt Rules — Anime / Manga Action
+
+Every prompt MUST use this exact structure:
+
+```
+Black and white line art illustration for an adult coloring book, anime manga style, clean bold outlines only, pure white background, PORTRAIT orientation (3:4 aspect ratio). No shading, no gray tones, no gradients. ALL dark or shadowy areas MUST be drawn with outline hatching lines — NEVER solid black fills. NO silhouettes. Every character and object must have interior line detail visible for coloring.
+
+[Scene description — max 2-3 characters, bright/daytime or neutral setting preferred.]
+
+Line art rules: bold clean outlines, open white areas for coloring, dynamic manga character design. NO solid black fills anywhere in the image. NO silhouettes. NO borders or frames. NOT a photograph. NOT a photo of a book page. NO book spine. NO page shadows. NO dark borders. NO paper texture. NO gray background.
+```
+
+**Anime/Manga style rules:**
+- Maximum 2-3 characters per scene — never crowds or armies
+- Prefer individual character portraits, duels, or solo action poses
+- Set scenes in **daylight or neutral lighting** — avoid night/dark settings
+- For "night scenes": describe as "moonlit sky with visible stars" not "dark night"
+- Hair: specify outline-drawn hair, NOT solid black fills (write "hair drawn with outline strokes")
+- Clothing patterns (haori, kimono): describe the pattern in outline form
+- Action effects (fire, water, lightning): always "stylized outline pattern effects" not filled shapes
+- Background: simple or minimal — rocky terrain, bamboo outlines, cloud shapes
+- Demons/monsters: max 1 per scene, drawn with full outline detail
+- Forest/tree scenes: "bare branch outlines" or "bamboo stalks as outline lines" — not dense filled foliage
+
+**Must AVOID:**
+- Crowds, armies, or groups larger than 3 characters
+- Night sky described as "dark" or "black"
+- Solid black hair, clothing, or shadow fills
+- Dense forest or jungle backgrounds
+- Silhouette figures in any part of the image
+- Borders, frames, book page appearance
+- "Coloring book page" phrasing (triggers book-photo output) — use "line art illustration" instead
+
+**Crowd/army scenes — replacement rule:**
+Instead of "a warrior surrounded by an army of demons", write "a warrior in a ready battle stance, two demons lunging toward him from either side, detailed armor and facial expressions on all figures"
+
+---
+
 ## Page Prompt Rules — Kids (Bold & Easy)
 
 Every prompt MUST use this structure:
@@ -149,7 +187,7 @@ A children's coloring book page. Black and white line art only. {SIZE_TAG}. [Cut
 ## Quality Requirements
 
 Before returning output, verify every prompt:
-1. Every adult prompt has Scene + Foreground + Midground + Background
+1. Every adult (cozy) prompt has Scene + Foreground + Midground + Background
 2. Every prompt includes the correct SIZE_TAG
 3. Every prompt says "NO borders, NO frames"
 4. Every prompt says "bold clean outlines" or "thick clean bold outlines"
@@ -157,6 +195,7 @@ Before returning output, verify every prompt:
 6. Variety of settings, activities, moods across all pages
 7. Cover prompt specifies full-color and NO text in image
 8. Total prompts count matches requested page_count
+9. Every anime/manga prompt: max 2-3 characters, NO solid black fills, NO night/dark backgrounds, NO crowds
 
 ---
 
@@ -174,6 +213,16 @@ Midground: The girl curled up in the oversized armchair, wearing a cozy sweater,
 Background: A large window showing rain droplets and distant rooftops, thick curtains tied back with bows, a bookshelf filled with books and small potted plants on the wall.
 
 Clean bold outlines, cozy relaxing environment, easy-to-color shapes, adult coloring book page. NO borders or frames.
+```
+
+## Example — Anime/Manga Prompt (8.5x11)
+
+```
+Black and white line art illustration for an adult coloring book, anime manga style, clean bold outlines only, pure white background, PORTRAIT orientation (3:4 aspect ratio). No shading, no gray tones, no gradients. ALL dark or shadowy areas MUST be drawn with outline hatching lines — NEVER solid black fills. NO silhouettes. Every character and object must have interior line detail visible for coloring.
+
+A young swordsman with spiky hair drawn in outline strokes (NOT solid black fills), wearing a checkered patterned haori coat with bold geometric squares, gripping a katana in a ready battle stance. A single demon opponent faces him — the demon has multiple eyes and elongated fingers, fully outlined with interior detail. Setting: open bamboo grove in afternoon light, tall bamboo stalks drawn as thin vertical outline lines with leaf clusters.
+
+Line art rules: bold clean outlines, open white areas for coloring, dynamic manga character design. NO solid black fills anywhere in the image. NO silhouettes. NO borders or frames. NOT a photograph. NOT a photo of a book page. NO book spine. NO page shadows. NO dark borders. NO gray background.
 ```
 
 ## Example — Kids Prompt (8.5x11)
