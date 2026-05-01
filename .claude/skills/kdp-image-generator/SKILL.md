@@ -48,11 +48,6 @@ python generate_images.py --theme {theme_key} --count {num_pages}
 python generate_images.py --plan output/{theme_key}/plan.json --count {num_pages} --start {start_index}
 ```
 
-**With explicit parallel workers (use `--workers 4` for flow renderer):**
-```bash
-python generate_images.py --plan output/{theme_key}/plan.json --renderer flow --workers 4
-```
-
 ### Step 3: Monitor Progress
 
 The script outputs:

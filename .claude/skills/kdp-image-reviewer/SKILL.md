@@ -162,29 +162,21 @@ Then summarize:
 
 ### Step 5: Regenerate Problem Pages
 
-For pages marked REDO, ask the user if they want to regenerate. Then:
+For pages marked REDO, ask the user if they want to regenerate. For each:
 
-1. Optionally fix prompts in `output/{theme_key}/plan.json` for REDO pages.
-
-2. Delete **all** REDO pages at once (never delete page_01 separately):
+1. Delete the bad image:
 ```bash
-rm output/{theme_key}/images/page_03.png output/{theme_key}/images/page_15.png output/{theme_key}/images/page_22.png
-# (list all REDO page filenames in one command)
+rm output/{theme_key}/images/page_XX.png
 ```
 
-3. Run generate_images.py **once** for the whole plan with parallel workers.
-   The script automatically skips existing files and only regenerates deleted pages:
+2. Optionally adjust the prompt in `output/{theme_key}/plan.json`
+
+3. Regenerate (0-indexed start):
 ```bash
-python generate_images.py --plan output/{theme_key}/plan.json --renderer flow --workers 4
+python generate_images.py --plan output/{theme_key}/plan.json --start {XX-1} --count 1
 ```
 
-4. **Re-review all regenerated pages** by reading them again with the Read tool.
-
-> **Why this approach:**
-> - Deleting only REDO pages (never page_01) prevents accidental page loss
-> - Running once with full plan lets the skip-if-exists logic handle targeting
-> - `--workers 4` enables parallel generation for all REDO pages simultaneously
-> - Never run `--count 1` per page — that defeats parallel execution
+4. **Re-review the regenerated page** by reading it again with the Read tool
 
 ---
 
