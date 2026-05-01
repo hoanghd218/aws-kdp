@@ -30,14 +30,44 @@ python generate_cover.py --theme cozy_cat_cafe --author "Your Name"
 
 ## Architecture
 
-- `config.py` - KDP specs (8.5x11", 300 DPI, 0.25" margins), THEMES dict, Gemini model (`gemini-3.1-flash-image-preview`), base prompt template
+- `config.py` - KDP specs, page sizes (`8.5x11` portrait, `8.5x8.5` square), gutter margin calculator (`get_gutter_margin`), path helpers, image provider constants, `THEMES` proxy (auto-discovers from `output/` subdirs + legacy hardcoded themes)
 - `plan_book.py` - Gemini text-only call to generate SEO title, subtitle, description, 7 keywords, cover prompt, and 20-30 page prompts. Saves to `output/{theme}/plan.json` + `output/{theme}/prompts.txt`
-- `image_providers.py` - Shared image generation providers (AI33, Bimai, NanoPic). Default renderer set via `IMAGE_RENDERER` in `.env`
-- `generate_images.py` - Calls configured image renderer per prompt, post-processes to grayscale line art. Supports both theme-based and plan-based modes. Saves to `output/{theme}/images/`
-- `build_pdf.py` - Assembles ReportLab PDF: title → copyright → coloring pages on odd pages with blank backs → thank you. Ensures even page count. Saves to `output/{theme}/interior.pdf`. **Requires theme in config.py THEMES dict**
-- `generate_cover.py` - Generates full KDP cover (front + spine + back) with AI-generated artwork and Pillow text overlay. Saves to `output/{theme}/cover.png` + `cover.pdf`. **Requires theme in config.py THEMES dict**
+- `image_providers.py` - Shared image generation providers (AI33, Bimai, NanoPic, flow). Default renderer set via `IMAGE_RENDERER` in `.env`. NanoPic supports a comma-separated pool of `NANOPIC_ACCESS_TOKEN`s for parallel throughput.
+- `generate_images.py` - Calls configured image renderer per prompt, post-processes to grayscale line art. Supports both theme-based (`--theme`) and plan-based (`--plan`) modes. Always uses `ThreadPoolExecutor` (parallel even for 1 page). Saves to `output/{theme}/images/`
+- `build_pdf.py` - Assembles ReportLab PDF: title → copyright → coloring pages on odd pages with blank backs → thank you. Ensures even page count. Gutter margin auto-calculated from page count per KDP rules. Saves to `output/{theme}/interior.pdf`.
+- `generate_cover.py` - Generates full KDP cover (front + spine + back) with AI-generated artwork and Pillow text overlay. Reuses saved `front_artwork.png` unless `--regenerate` passed. Sample pages on back cover are evenly spaced across the book. Saves to `output/{theme}/cover.png` + `cover.pdf`.
+- `batch_generate_images.py` - Scans all `output/` subdirs, finds missing page images, generates them using nanopic + ai33 in parallel (12 threads by default).
+- `batch_plan_generator.py` - Reads idea markdown files from `ideas/`, writes `plan.json` for each without calling AI (prompts hand-written by Claude).
+- `scripts/batch_rebuild_cover.py` - Rebuilds covers for all books in `output/` in parallel (6 workers).
+- `scripts/batch_rebuild_interior.py` - Rebuilds interior PDFs for all books in `output/` in parallel.
+- `services/` - Flow renderer backend: `flow_server.py` (aiohttp WebSocket + HTTP server), `flow_client.py` (singleton client state), `flow_sdk.py` (async SDK wrapping the Flow Recaptcha Chrome extension protocol).
 
-**Important**: `build_pdf.py` and `generate_cover.py` only accept `--theme` values registered in `config.py` THEMES dict. After `plan_book.py` creates a new theme, you must add it to THEMES before building the PDF or cover. `generate_images.py --plan` bypasses this requirement.
+**Theme resolution**: `THEMES` is a dynamic proxy — `build_pdf.py` and `generate_cover.py` auto-discover any theme that has `output/{theme}/plan.json` or `output/{theme}/prompts.txt`. No manual registration needed for plan-based themes.
+
+## Image Renderers
+
+Set `IMAGE_RENDERER` in `.env` to one of: `ai33`, `bimai`, `nanopic`, `kie`, `flow`.
+
+Override per-run with `--renderer <name>`. NanoPic supports a comma-separated `NANOPIC_ACCESS_TOKEN` pool for parallel throughput.
+
+## Square Books (8.5x8.5)
+
+Pass `--size 8.5x8.5` to `plan_book.py`, `generate_images.py`, `build_pdf.py`, and `generate_cover.py` to produce square-format books. The default is `8.5x11` portrait.
+
+## Flow Renderer (Google Flow / Flowboard Bridge)
+
+The `flow` renderer uses a Chrome extension instead of an API key:
+1. Install the Flow Recaptcha extension; open labs.google in Chrome
+2. Start the local bridge server: `python services/flow_server.py`
+3. Run generation with `--renderer flow --workers 4` (higher values overload the single browser connection)
+
+To regenerate specific pages — **delete only those pages, then run once**:
+```bash
+rm output/{theme}/images/page_03.png output/{theme}/images/page_15.png
+python generate_images.py --plan output/{theme}/plan.json --renderer flow --workers 4
+# skip-if-exists logic skips all other pages automatically
+```
+Never delete `page_01.png` separately — it causes data loss.
 
 ## Custom Commands (Skills)
 
