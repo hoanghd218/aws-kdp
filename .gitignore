@@ -1,14 +1,23 @@
-__pycache__/
-*.pyc
-.venv/
-venv/
-.DS_Store
-*.zip
-output/**/*.png
-/cc_scape/jadesummer_research
-/.firecrawl
-/jade_summer_idea
-/uploaded to amazon
-/tmp
-/scripts/output
-/output
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+*.zip
+output/**/*.png
+/cc_scape/jadesummer_research
+/.firecrawl
+/jade_summer_idea
+/uploaded to amazon
+/tmp
+/scripts/output
+/output
+
+# Environment configuration files
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+config.bat
+node_modules
