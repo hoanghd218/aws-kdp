@@ -120,11 +120,17 @@ Create the plan JSON file at `output/{theme_key}/plan.json`:
   "description": "...",
   "keywords": ["kw1", "kw2", "kw3", "kw4", "kw5", "kw6", "kw7"],
   "cover_prompt": "...",
+  "back_cover_prompt": "...",
   "page_prompts": ["prompt1", "prompt2", ...]
 }
 ```
 
 **`page_size`** defaults to `"8.5x11"` if not specified. This field is read by `generate_images.py`, `build_pdf.py`, and `generate_cover.py` to set the correct dimensions and aspect ratio.
+
+**`cover_prompt` + `back_cover_prompt`** feed the `kdp-chatgpt-cover-creator` skill. Write both in the detailed "ads-marketing" format (this sells far better than a plain illustration):
+
+- **`cover_prompt` (front)** — `Use case: ads-marketing.` then bake **all** cover text INTO the art: title, subtitle, two short taglines (e.g. "For Adults"/"Bold & Easy" or "Ages 3-7"/"Bold and Easy"), and the author name spelled out letter-by-letter. State the panel shape from `page_size` (square 1:1 for 8.5×8.5, portrait 3:4 for 8.5×11). Demand all text stay inside safe margins with padding from every edge; no barcode/watermark/mockup.
+- **`back_cover_prompt` (back)** — `Use case: ads-marketing.` A **2×3 grid of six sample preview cards** of the book's scenes: **top row = 3 fully COLORED finished examples, bottom row = 3 black-and-white line-art previews**. **The cards must match the book shape — square (1:1) cards for a square 8.5×8.5 book**, portrait cards for 8.5×11; all the same size. Surround with on-theme decorations. No title/author text, no barcode box, no blank white rectangle (the barcode is stamped by code).
 
 Also save `output/{theme_key}/prompts.txt` (one prompt per line).
 

@@ -1,13 +1,15 @@
 ---
 name: kdp-cover-checker
 description: >
-  Validate KDP book cover PDFs against Amazon's dimension, bleed, and DPI specifications.
+  Validate KDP book cover PDFs against Amazon's dimension, bleed, and DPI specifications,
+  AND check that no cover TEXT sits in the trim-unsafe margin (the #1 reject reason).
   Checks cover width/height based on page count and spine calculation, verifies 0.125" bleed
-  on all sides, and ensures minimum 300 DPI. Supports both 8.5x11 (portrait) and 8.5x8.5
-  (square) trim sizes. Can check a single book or scan all books in output/ folder.
-  USE WHEN user says 'check cover', 'verify cover', 'validate cover', 'kiem tra bia',
-  'cover dimensions', 'cover size check', 'kdp cover check', 'cover compliance',
-  'check all covers', 'are my covers correct', 'cover specs', 'kiem tra kich thuoc bia'.
+  on all sides, ensures minimum 300 DPI, and renders a safe-zone overlay. Supports both
+  8.5x11 (portrait) and 8.5x8.5 (square) trim sizes. Can check a single book or scan all
+  books in output/ folder. USE WHEN user says 'check cover', 'verify cover', 'validate cover',
+  'kiem tra bia', 'cover dimensions', 'cover size check', 'kdp cover check', 'cover compliance',
+  'check all covers', 'are my covers correct', 'cover specs', 'kiem tra kich thuoc bia',
+  'text too close to edge', 'cover bi tu choi', 'safe zone', 'chu sat mep'.
 ---
 
 # KDP Cover Checker
@@ -72,6 +74,28 @@ height = trim_height + 0.125" (bleed top) + 0.125" (bleed bottom)
 
 ### DPI
 - Minimum 300 DPI required
+
+### Text safe zone (the #1 reject — ALWAYS check this)
+KDP trims the wrap ~0.125" in (bleed) and the printer can drift another ~0.25", so **any
+TEXT within 0.375" of the trim line (= 0.5" / 150px from the file edge at 300 DPI) can be
+shaved off.** The rejection email reads *"move all text at least 0.375 inches (9.5 mm) away
+from all edges."* This is the most common reason a cover comes back.
+
+Run the safe-zone checker — it writes `output/{theme}/cover_safe_check.png` (green = trim,
+red = text-safe line) and prints per-edge ink %:
+
+```bash
+python scripts/check_cover_safezone.py <theme_key>
+# or on an explicit file:  python scripts/check_cover_safezone.py --png output/<theme>/cover.png
+```
+
+**The overlay is the real gate, not the number.** OPEN `cover_safe_check.png` and confirm
+**no letter, number, or text badge crosses the RED line.** Decorative art (balloons, confetti,
+sparkles, gift boxes, bunting) crossing the red line is FINE — only text must stay inside.
+On full-bleed vibrant covers the ink % runs high on every edge (decoration bleeds); trust the
+picture. If any text crosses: for AI-baked front text, re-roll the front with the title/badges/
+author pulled into the central ~75% (see the kdp-chatgpt-cover-creator prompt rules); for code
+overlays, move them inward (`--headline-y`, `--badge-x`, etc.).
 
 ### Tolerance
 - Dimension tolerance: +/- 0.01" (3 pixels at 300 DPI)

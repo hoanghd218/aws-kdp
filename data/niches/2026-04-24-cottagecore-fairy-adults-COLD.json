@@ -1,0 +1,146 @@
+{
+  "niche_name": "cottagecore fairy enchanted forest coloring book for adults",
+  "primary_keyword": "cottagecore fairy coloring book adults",
+  "secondary_keywords": [
+    "fairy coloring book adults",
+    "cottagecore coloring book",
+    "enchanted forest coloring"
+  ],
+  "long_tail_keywords": [
+    "cottagecore fairy coloring book for adults",
+    "enchanted fairy garden coloring",
+    "whimsical fairy coloring"
+  ],
+  "audience": "adults_cozy",
+  "recommended_list_price_usd": 9.99,
+  "target_page_count": 80,
+  "is_seasonal": false,
+  "is_evergreen": true,
+  "is_trend": true,
+  "has_trademark_risk": false,
+  "ip_risk_notes": "Avoid Tinkerbell/Disney fairies, Studio Ghibli character refs",
+  "content_concepts_count": 55,
+  "content_concepts_sample": [
+    "Fairy in mushroom cottage",
+    "Fairy library in tree hollow",
+    "Fairy tea party with hedgehogs"
+  ],
+  "leading_indicators": {
+    "etsy": "Very strong \u2014 cottagecore printables top-sellers",
+    "pinterest": "Rising \u2014 #cottagecore 2.4B views",
+    "google_trends": "Evergreen w/ spring peak",
+    "tiktok": "#cottagecore #fairycore trending"
+  },
+  "book_type": "coloring",
+  "page_size": "8.5x11",
+  "is_seasonal_recurring": false,
+  "is_fad": false,
+  "days_to_peak": 999,
+  "top10_asins": [
+    "B0F2DWXDSR",
+    "B0CGL9T614",
+    "B0C5YMQRMZ",
+    "B0G9TPVL7Q",
+    "B0GWRRP518",
+    "B0BJS3HF68",
+    "0486851745",
+    "B0DHRKFY6Z",
+    "B0C6W3G4WL",
+    "B0GV4S1G47"
+  ],
+  "top10_bsr": [
+    147405,
+    846774,
+    1912093,
+    2533613,
+    1168832,
+    364592,
+    4410746,
+    811204,
+    603347
+  ],
+  "top10_reviews": [
+    12,
+    9,
+    73,
+    4,
+    0,
+    29,
+    37,
+    3,
+    172,
+    1
+  ],
+  "top10_prices": [
+    6.99,
+    7.89,
+    11.95,
+    11.99,
+    8.06,
+    8.95,
+    4.93,
+    9.99,
+    9.99,
+    9.99
+  ],
+  "top10_pages": [
+    102,
+    100,
+    204,
+    78,
+    103,
+    76,
+    64,
+    44,
+    104,
+    85
+  ],
+  "top10_publishers": [
+    "Independently published",
+    "Independently published",
+    "Independently published",
+    "Independently published",
+    "Independently published",
+    "Independently published",
+    "Dover Publications",
+    "Independently published",
+    "Independently published",
+    "Independently published"
+  ],
+  "top10_age_days": [
+    398,
+    974,
+    1070,
+    126,
+    16,
+    1284,
+    919,
+    581,
+    1059,
+    30
+  ],
+  "top10_rating": [
+    4.4,
+    4.1,
+    4.2,
+    3.2,
+    0.0,
+    4.4,
+    4.2,
+    5.0,
+    4.5,
+    4.0
+  ],
+  "sources": [
+    "https://www.amazon.com/dp/B0F2DWXDSR",
+    "https://www.amazon.com/dp/B0CGL9T614",
+    "https://www.amazon.com/dp/B0C5YMQRMZ",
+    "https://www.amazon.com/dp/B0G9TPVL7Q",
+    "https://www.amazon.com/dp/B0GWRRP518",
+    "https://www.amazon.com/dp/B0BJS3HF68",
+    "https://www.amazon.com/dp/0486851745",
+    "https://www.amazon.com/dp/B0DHRKFY6Z",
+    "https://www.amazon.com/dp/B0C6W3G4WL",
+    "https://www.amazon.com/dp/B0GV4S1G47"
+  ]
+}

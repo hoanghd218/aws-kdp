@@ -121,6 +121,10 @@ Full height = trim_height + (2 × 0.125" bleed)
 
 KDP can also provide exact dimensions — use `--kdp-width` and `--kdp-height` to override.
 
+> **Old cover is auto-backed-up.** Before writing the new `cover.png`/`cover.pdf`,
+> `generate_cover.py` copies any existing ones to `output/{theme_key}/backups/` with a
+> timestamp — a rebuild never destroys the version that may already be on KDP.
+
 ### Step 6: Verify Output (KDP Pre-flight)
 
 Check:
@@ -134,6 +138,12 @@ Check:
 - **Spine text clearance**: if spine has text, verify 0.0625" clearance on each side
 - **Spine text only if 79+ pages** — fewer pages = no spine text allowed
 - **Metadata consistency**: title on cover must match title on interior title page
+- **Text safe zone (#1 cover reject)** — `generate_cover.py` now **auto-runs the safe-zone
+  checker** and writes `output/{theme_key}/cover_safe_check.png` (green trim line, red
+  text-safe line at 0.375" inside trim). **OPEN it and confirm NO text/badge/author crosses
+  the RED line** (decorative art crossing it is fine). Re-run any time with
+  `python scripts/check_cover_safezone.py {theme_key}`. If text crosses, regenerate the front
+  so all text sits in the central ~75% of the panel.
 
 ---
 
@@ -207,3 +217,4 @@ artwork = generate_front_artwork(theme, title, renderer=renderer, size=size)
 - [ ] 300 DPI resolution
 - [ ] Spine width calculated correctly for page count
 - [ ] Cover height matches book trim height + bleed
+- [ ] **`cover_safe_check.png` opened — no text/badge crosses the red text-safe line**

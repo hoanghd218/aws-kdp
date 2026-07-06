@@ -1,0 +1,4 @@
+interface:
+  display_name: "KDP ChatGPT Cover Creator"
+  short_description: "Create KDP covers with ChatGPT imagegen"
+  default_prompt: "Use $kdp-chatgpt-cover-creator to create a KDP-ready cover PDF for my coloring book."

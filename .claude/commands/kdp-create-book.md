@@ -1,23 +1,20 @@
 ---
 description: Create a KDP coloring book end-to-end (interview → prompts → images → PDF → cover)
 argument-hint: [concept description]
-allowed-tools: Agent, AskUserQuestion
+allowed-tools: Skill, AskUserQuestion, Bash, Read, Write, Edit, Glob, Grep
 ---
 
 # KDP Coloring Book Creator
 
-Invoke the `kdp-book-creator` agent to handle the full book creation pipeline.
+Invoke the `kdp-book-creator` skill to run the full book creation pipeline inline (no sub-agents): interview, planning, image generation, image review & auto-regeneration, PDF assembly, and cover creation.
 
-Use the Agent tool to spawn the kdp-book-creator agent (subagent_type: "kdp-book-creator") with this prompt:
-
-```
-Create a KDP coloring book end-to-end.
-```
+Use the Skill tool with `skill: "kdp-book-creator"`.
 
 If $ARGUMENTS is provided, pass it as the concept:
 
 ```
-Create a KDP coloring book with this concept: $ARGUMENTS
+Skill: kdp-book-creator
+args:  "Create a KDP coloring book with this concept: $ARGUMENTS"
 ```
 
-The agent handles everything: interview, planning, image generation, image review & auto-regeneration, PDF assembly, and cover creation.
+Otherwise invoke the skill with no concept and let it run its Phase 1 interview.

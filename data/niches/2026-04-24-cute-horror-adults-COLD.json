@@ -1,0 +1,145 @@
+{
+  "niche_name": "cute horror creepy parody coloring book for adults",
+  "primary_keyword": "cute horror coloring book adults",
+  "secondary_keywords": [
+    "creepy cute coloring book",
+    "spooky coloring book adults",
+    "horror parody coloring"
+  ],
+  "long_tail_keywords": [
+    "cute horror coloring book for adults",
+    "creepy cute halloween coloring",
+    "pastel goth coloring book"
+  ],
+  "audience": "adults_alt",
+  "recommended_list_price_usd": 9.99,
+  "target_page_count": 80,
+  "is_seasonal": false,
+  "is_evergreen": true,
+  "is_trend": true,
+  "has_trademark_risk": false,
+  "ip_risk_notes": "Avoid named horror icons (Freddy, Michael Myers, Pennywise); generic creepy-cute OK",
+  "content_concepts_count": 50,
+  "content_concepts_sample": [
+    "Cute ghost in flower field",
+    "Pastel goth cat with bats",
+    "Kawaii grim reaper in moonlight"
+  ],
+  "leading_indicators": {
+    "etsy": "Strong \u2014 creepy-cute printables",
+    "pinterest": "Rising \u2014 #pastelgoth #creepycute",
+    "google_trends": "Halloween spike + evergreen",
+    "tiktok": "#creepycute strong on BookTok"
+  },
+  "book_type": "coloring",
+  "page_size": "8.5x11",
+  "is_seasonal_recurring": false,
+  "is_fad": false,
+  "days_to_peak": 999,
+  "top10_asins": [
+    "B0CKYZJFMT",
+    "B0G19NCM99",
+    "B0F5H97Z51",
+    "B0DK1W9GBJ",
+    "B0GWMQPYV3",
+    "B0G4VSQ9G1",
+    "B0F6LBMNSJ",
+    "B0FH2KT69S",
+    "B0GNMWDYBL",
+    "B094T533WJ"
+  ],
+  "top10_bsr": [
+    336922,
+    63098,
+    2140,
+    155975,
+    386248,
+    135583,
+    11619,
+    444888,
+    216563,
+    126749
+  ],
+  "top10_reviews": [
+    30,
+    26,
+    770,
+    33,
+    0,
+    13,
+    284,
+    8,
+    10,
+    7580
+  ],
+  "top10_prices": [
+    4.99,
+    5.68,
+    9.99,
+    9.99,
+    9.99,
+    9.99,
+    7.82,
+    10.99,
+    9.99,
+    9.99
+  ],
+  "top10_pages": [
+    102,
+    86,
+    88,
+    63,
+    102,
+    86,
+    75,
+    95,
+    50
+  ],
+  "top10_publishers": [
+    "Independently published",
+    "Independently published",
+    "Independently published",
+    "Independently published",
+    "Independently published",
+    "Independently published",
+    "apolyone",
+    "Independently published",
+    "Independently published",
+    "Independently published"
+  ],
+  "top10_age_days": [
+    925,
+    169,
+    365,
+    559,
+    17,
+    144,
+    293,
+    69,
+    1807
+  ],
+  "top10_rating": [
+    4.2,
+    4.8,
+    4.7,
+    4.3,
+    0.0,
+    4.5,
+    4.5,
+    4.2,
+    5.0,
+    4.8
+  ],
+  "sources": [
+    "https://www.amazon.com/dp/B0CKYZJFMT",
+    "https://www.amazon.com/dp/B0G19NCM99",
+    "https://www.amazon.com/dp/B0F5H97Z51",
+    "https://www.amazon.com/dp/B0DK1W9GBJ",
+    "https://www.amazon.com/dp/B0GWMQPYV3",
+    "https://www.amazon.com/dp/B0G4VSQ9G1",
+    "https://www.amazon.com/dp/B0F6LBMNSJ",
+    "https://www.amazon.com/dp/B0FH2KT69S",
+    "https://www.amazon.com/dp/B0GNMWDYBL",
+    "https://www.amazon.com/dp/B094T533WJ"
+  ]
+}
