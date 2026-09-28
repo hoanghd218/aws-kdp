@@ -2,7 +2,7 @@
 """Batch-pull Apify top-10 for many keywords, then print the ranked Opportunity table.
 
 Usage (from repo root):
-    python3 .claude/skills/kdp-niche-finder/scripts/niche_sweep.py \
+    python3 .agents/skills/kdp-niche-finder/scripts/niche_sweep.py \
         "bass_fishing=bass fishing coloring book" \
         "frog_adults=frog coloring book for adults"
 

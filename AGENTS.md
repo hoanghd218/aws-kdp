@@ -8,10 +8,10 @@ You receive a book creation request as input and produce a complete KDP-ready co
 
 ## How It Works
 
-When you receive a request to create a book, use the **`/kdp-create-book`** command to handle the entire process:
+When you receive a request to create a book, use the **`$kdp-book-creator`** skill to handle the entire process:
 
 ```
-/kdp-create-book {user's concept}
+$kdp-book-creator {user's concept}
 ```
 
 ### Input
@@ -23,18 +23,20 @@ The user provides a book concept. Examples:
 
 ### Process
 
-The `/kdp-create-book` command runs 7 phases end-to-end:
+The `$kdp-book-creator` skill runs the production pipeline end-to-end:
 
-1. **Interview** — Hỏi user: concept, audience (adults/kids), số trang, theme key, tên tác giả
-2. **Plan & Prompts** — Viết SEO metadata + tất cả prompts cho từng trang (`kdp-prompt-writer`)
-3. **Review Plan** — Trình bày plan cho user duyệt
-4. **Generate Images** — Tạo ảnh coloring pages bằng Gemini API (`kdp-image-generator`)
-5. **Review Images** — Kiểm tra chất lượng từng trang (`kdp-image-reviewer`)
-6. **Build Book** — Ghép PDF interior + tạo cover (`kdp-book-builder`)
-7. **Deliver** — Trả file hoàn chỉnh + hướng dẫn upload KDP
+1. **Commercial Gate** — Nếu mục tiêu là bán, validate ngách bằng dữ liệu Amazon trước khi sản xuất
+2. **Interview** — Concept, audience, trim, số trang, theme key, tác giả, style/avoid list
+3. **Plan & Content Architecture** — Metadata, style bible, content arc, prompt uniqueness, copy frontmatter được biên tập
+4. **Review Plan** — Trình bày evidence + plan + exact title/closing copy để user duyệt
+5. **Generate Images** — Dùng built-in `imagegen` cho từng trang, frontmatter artwork và cover artwork; không dùng Gemini mặc định
+6. **Review Images** — Kiểm tra trực quan mọi trang, regenerate có mục tiêu
+7. **Build Interior** — Artwork từ imagegen, chữ chính xác được render bằng code; ghép PDF và QC
+8. **Build Cover** — Imagegen tạo artwork không chữ; code ghép title/author/back copy/spine/barcode zone
+9. **Preflight & Deliver** — Kiểm tra KDP, nhắc khai báo AI-generated, trả PDF/PNG/plan hoàn chỉnh
 
 ### Output
 
-- 📄 **Interior PDF**: `output/books/{theme}_coloring_book.pdf` — Sách hoàn chỉnh, sẵn sàng upload KDP
-- 🎨 **Cover**: `covers/{theme}_cover.png` — Bìa sách (front + spine + back)
-- 📋 **Plan**: `plans/{theme}_plan.json` — Metadata + keywords + prompts
+- 📄 **Interior PDF**: `output/{theme_key}/interior.pdf` — Sách hoàn chỉnh, sẵn sàng upload KDP
+- 🎨 **Cover**: `output/{theme_key}/cover.pdf` và `cover.png` — Bìa sách (front + spine + back)
+- 📋 **Plan**: `output/{theme_key}/plan.json` — Metadata + keywords + prompts

@@ -52,7 +52,9 @@ These are the exact rules the checker validates:
 ```
 spine_width = total_pages * 0.002252"
 ```
-Where `total_pages` = the interior PDF page count (white paper, black ink).
+Where `total_pages` = KDP's calculated page count (white paper, black ink).
+If the interior PDF has an odd page count, KDP rounds it up to the next even
+number for the spine and cover dimensions.
 
 ### Full Cover Dimensions
 ```

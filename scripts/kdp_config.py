@@ -62,25 +62,58 @@ def full_cover_dims(page_size: str, page_count: int, paper: str = "white") -> di
 # Royalty math (KDP paperback, 60% royalty rate, US marketplace)
 # ────────────────────────────────────────────────────────
 
-PRINTING_FIXED_USD = 0.85
-PRINTING_PER_PAGE_BW = 0.012    # black-and-white interior
-PRINTING_PER_PAGE_COLOR = 0.07  # color interior (premium)
-
-ROYALTY_RATE_PAPERBACK = 0.60
+# Amazon.com paperback costs/rates, checked against KDP Help in August 2026.
+# Both production trims in this repo are "large trim" (> 6.12" wide).
+ROYALTY_RATE_US_LOW = 0.50
+ROYALTY_RATE_US_HIGH = 0.60
+ROYALTY_RATE_US_HIGH_MIN_PRICE = 9.99
 KENP_RATE_USD = 0.0045           # approximate US KDP Select KENP read rate
 
 
-def printing_cost_usd(page_count: int, color: bool = False) -> float:
-    per_page = PRINTING_PER_PAGE_COLOR if color else PRINTING_PER_PAGE_BW
-    return round(PRINTING_FIXED_USD + page_count * per_page, 3)
+def _is_large_trim(page_size: str) -> bool:
+    width, height = TRIM_SIZES.get(page_size, TRIM_SIZES["8.5x11"])
+    return width > 6.12 or height > 9.0
 
 
-def royalty_per_sale_usd(list_price: float, page_count: int, color: bool = False) -> float:
-    return round((list_price - printing_cost_usd(page_count, color)) * ROYALTY_RATE_PAPERBACK, 3)
+def printing_cost_usd(page_count: int, color: bool = False, page_size: str = "8.5x11") -> float:
+    """Estimate Amazon.com paperback printing cost for white paper.
+
+    KDP applies a fixed-only price to short books, then fixed + per-page
+    pricing above the short-book threshold. Trim category changes the rate.
+    """
+    large = _is_large_trim(page_size)
+    if color:
+        if page_count <= 40:
+            return 4.20 if large else 3.60
+        per_page = 0.080 if large else 0.065
+        return round(1.00 + page_count * per_page, 2)
+    if page_count <= 110:
+        return 2.84 if large else 2.30
+    per_page = 0.017 if large else 0.012
+    return round(1.00 + page_count * per_page, 2)
 
 
-def break_even_acos_pct(list_price: float, page_count: int, color: bool = False) -> float:
-    royalty = royalty_per_sale_usd(list_price, page_count, color)
+def paperback_royalty_rate_usd(list_price: float) -> float:
+    return ROYALTY_RATE_US_HIGH if list_price >= ROYALTY_RATE_US_HIGH_MIN_PRICE else ROYALTY_RATE_US_LOW
+
+
+def royalty_per_sale_usd(
+    list_price: float,
+    page_count: int,
+    color: bool = False,
+    page_size: str = "8.5x11",
+) -> float:
+    rate = paperback_royalty_rate_usd(list_price)
+    return round((rate * list_price) - printing_cost_usd(page_count, color, page_size), 3)
+
+
+def break_even_acos_pct(
+    list_price: float,
+    page_count: int,
+    color: bool = False,
+    page_size: str = "8.5x11",
+) -> float:
+    royalty = royalty_per_sale_usd(list_price, page_count, color, page_size)
     if list_price <= 0:
         return 0.0
     return round(100 * royalty / list_price, 2)
@@ -92,8 +125,9 @@ def max_cpc_usd(
     target_acos_pct: float = 40,
     conversion_rate_pct: float = 8,
     color: bool = False,
+    page_size: str = "8.5x11",
 ) -> float:
-    royalty = royalty_per_sale_usd(list_price, page_count, color)
+    royalty = royalty_per_sale_usd(list_price, page_count, color, page_size)
     return round(royalty * (target_acos_pct / 100.0) * (conversion_rate_pct / 100.0), 3)
 
 
@@ -137,11 +171,15 @@ def bsr_to_daily_sales(bsr: int) -> dict:
 
 
 def estimate_monthly_royalty(
-    bsr: int, list_price: float, page_count: int, color: bool = False
+    bsr: int,
+    list_price: float,
+    page_count: int,
+    color: bool = False,
+    page_size: str = "8.5x11",
 ) -> dict:
     """End-to-end monthly royalty estimate for a book at a given BSR."""
     sales = bsr_to_daily_sales(bsr)
-    royalty = royalty_per_sale_usd(list_price, page_count, color)
+    royalty = royalty_per_sale_usd(list_price, page_count, color, page_size)
     return {
         "bsr": bsr,
         "daily_sales_low": sales["low"],

@@ -1,168 +1,112 @@
 ---
 name: kdp-prompt-writer
-description: Analyze concepts and write SEO-optimized prompts for KDP coloring books. Claude writes ALL prompts — no AI generation. USE WHEN user says 'write coloring book prompts', 'create book plan', 'plan coloring book', 'write page prompts', 'kdp prompts', 'coloring book plan', 'write book metadata', 'create kdp plan'.
+description: "Analyze a coloring-book concept and write the complete production plan: market-aware metadata, style bible, content arc, polished front matter, text-free imagegen cover/frontmatter prompts, and unique interior page prompts. Use for book planning, page prompts, metadata, or plan.json creation and revision."
 ---
 
 # KDP Prompt Writer
 
-Claude analyzes the book concept and writes everything: SEO metadata, cover prompt, and all interior page prompts. NO AI/Gemini is used for this step — Claude is the expert prompt writer.
+Codex writes all plan text directly. Do not call another model for prompt or metadata writing.
 
----
+## Workflow
 
-## When to Use
+1. Read the adult or kids guide in `references/`.
+2. Confirm concept, differentiating angle, audience/age, trim, unique coloring-page count, author, and avoid list.
+3. If commercial viability matters, require the saved `$kdp-niche-finder` evidence or clearly mark validation as skipped/low confidence.
+4. Define the product and content architecture before individual prompts.
+5. Write exact metadata and editorial copy.
+6. Write structured imagegen prompts and validate uniqueness.
+7. Save valid JSON plus one-prompt-per-line text.
 
-- User wants to plan a new coloring book
-- The `/project:kdp-create-book` command reaches the planning phase
-- User wants to write or rewrite prompts for an existing theme
+## Content architecture
 
----
+Create:
 
-## Process
+- `buyer_promise`: what experience/result the buyer receives;
+- `style_bible`: stable subject traits, medium, line weight, detail density, composition rules, cover palette, and forbidden elements;
+- 4–6 `sections` with a progression in setting, activity, mood, or difficulty;
+- `duplication_matrix`: one row per page with subject, action, setting, pose/camera, hero props, and section.
 
-### Step 1: Determine Audience, Page Size & Load Guidelines
+No two pages may reuse the same subject + action + setting. Avoid padding the count with near-duplicates.
 
-Determine the **page_size** (from user or calling command):
-- `"8.5x11"` — Portrait (default). Images are 3:4 aspect ratio.
-- `"8.5x8.5"` — Square. Images are 1:1 aspect ratio. All prompts must describe SQUARE compositions.
+## Metadata
 
-Read the appropriate reference guide:
-- **Adults**: Read `references/adult-prompt-guide.md` in this skill directory
-- **Kids**: Read `references/kids-prompt-guide.md` in this skill directory
+- Title/subtitle must read naturally and match the book exactly; never keyword-stuff or use unsupported promotional claims.
+- Description must state only real production facts: actual unique illustrations, trim, single-sided layout, audience, style, and featured subjects.
+- Supply 7 nonduplicative backend keyword phrases and relevant categories.
+- Coloring books are generally not low-content under Amazon's current definition; do not mark them low-content by default.
 
-### Step 2: Write SEO Metadata
+## Polished front matter
 
-Generate based on the concept:
+Write book-specific copy, not templates that could fit any topic:
 
-**Title** — Catchy, keyword-rich, includes audience indicator
-- Adults: e.g., "Whiskers & Warmth: A Cozy Cat Café Coloring Book for Adults"
-- Kids: e.g., "Amazing Dinosaurs Coloring Book for Kids Ages 6-12"
-
-**Subtitle** — Descriptive, complementary
-- Adults: e.g., "Relaxing Kawaii Scenes with Cute Cats, Warm Drinks & Cozy Interiors"
-- Kids: e.g., "Bold & Easy Designs for Creative Kids"
-
-**Description** — 3-5 sentences for Amazon KDP listing. Emphasize:
-- Adults: cozy charm, relaxation, stress relief, beautiful scenes
-- Kids: fun, creativity, learning, hours of entertainment
-
-**Keywords** — 7 SEO-relevant keywords for Amazon search
-
-### Step 3: Write Cover Prompt
-
-**Adults cover prompt must include:**
-- Full-color illustration (NOT black-and-white)
-- Warm, premium cozy aesthetic
-- Multiple large readable props and decorative elements
-- Title and subtitle text reference
-- State "Coloring Book for Adults"
-
-**Kids cover prompt must include:**
-- Full-color, vibrant cartoon style
-- Eye-catching, professional children's book cover art
-- DO NOT include any text/letters/words in the generated image
-- Bright colors, cheerful composition
-- Mention "Coloring Book for Kids Ages 6-12"
-
-### Step 4: Write Page Prompts (20-30)
-
-**For Adults (Cozy & Cute):**
-Each prompt describes a complete black-and-white coloring page with:
-- "Cute cozy medium-detail" adult aesthetic
-- **KDP line thickness**: All outlines must be bold enough to meet KDP's minimum 0.75pt (0.01") line weight. Add "bold thick outlines suitable for coloring" to every prompt.
-- Complete layered scene: foreground + midground + background
-- Large, clear decorative shapes — NO dense micro-patterns
-- Simplified vegetation (large stylized shapes, wide spacing, no micro-veins)
-- Spaced-out background motifs (wallpapers, textiles use big shapes)
-- Kawaii character proportions (consistent across pages)
-- Cozy environment props: shelves, lamps, cushions, windows, curtains, tables, art, rugs
-- Mix of solo scenes and occasional secondary character interactions
-- **If page_size is 8.5x8.5**: Add "SQUARE format (1:1 aspect ratio)" to every prompt. Compose scenes that work well in a square frame — balanced, not too tall.
-- **If page_size is 8.5x11**: Add "PORTRAIT orientation (taller than wide)" to every prompt.
-
-**For Kids (Bold & Easy):**
-Each prompt describes a single-subject coloring page with:
-- Black-and-white line art only
-- Bold, thick, clean outlines for ages 6-12 (must meet KDP minimum 0.75pt / 0.01" line weight)
-- Single subject centered, fills most of page
-- NO shading, gradients, borders, or frames
-- White background
-- Cute, friendly, appealing style
-- Simple enough for crayons/markers
-- **If page_size is 8.5x8.5**: Add "SQUARE format (1:1 aspect ratio)" to every prompt. Subject should fill the square frame evenly.
-- **If page_size is 8.5x11**: Add "PORTRAIT orientation (taller than wide)" to every prompt.
-
-### Step 5: Ensure Variety
-
-Page prompts must cover diverse scenes/activities:
-- Different settings (indoor, outdoor, seasonal)
-- Different activities (cooking, reading, playing, sleeping, crafting)
-- Different moods (playful, peaceful, cozy, adventurous)
-- Main character in different poses/situations
-
-**IMPORTANT — Avoid AI Body-Part Errors**: AI image generation (Gemini) frequently renders multiple characters with merged/fused bodies, missing limbs, extra arms, or overlapping anatomy — making them look deformed. To prevent this:
-- **Minimize the number of characters per scene** — fewer characters = fewer rendering errors
-- When multiple characters appear, they must be **clearly separated** with space between them (no touching, overlapping, or intertwined poses)
-- Prefer a **pet companion** (cat, dog, bunny) over a second human character — animals are simpler to render correctly
-- Avoid prompts with physically close interactions (hugging, holding hands, dancing together) — these cause body-part fusion errors
-- Add "IMPORTANT: Each character must have clearly defined, complete body with no overlapping or merged body parts" to every prompt that includes more than one character
-- Background characters (e.g., vendors at a market) are acceptable only if they are small, distant, and clearly separated from the main character
-
-### Step 6: Save Plan
-
-Create the plan JSON file at `output/{theme_key}/plan.json`:
 ```json
-{
-  "theme_key": "the_theme_key",
-  "audience": "adults|kids",
-  "page_size": "8.5x11|8.5x8.5",
-  "title": "...",
-  "subtitle": "...",
-  "description": "...",
-  "keywords": ["kw1", "kw2", "kw3", "kw4", "kw5", "kw6", "kw7"],
-  "cover_prompt": "...",
-  "page_prompts": ["prompt1", "prompt2", ...]
+"front_matter": {
+  "title_kicker": "short promise",
+  "ownership_heading": "kids only",
+  "closing_heading": "theme-specific headline",
+  "closing_message": "2–3 sentences referencing concrete book scenes, mood, or achievement",
+  "review_request": "one neutral request for an honest Amazon review"
 }
 ```
 
-**`page_size`** defaults to `"8.5x11"` if not specified. This field is read by `generate_images.py`, `build_pdf.py`, and `generate_cover.py` to set the correct dimensions and aspect ratio.
+Do not use “Thank you for being here,” “Made with love,” “Share and tag us on Amazon,” or requests for a positive/five-star review.
 
-Also save `output/{theme_key}/prompts.txt` (one prompt per line).
+## Imagegen prompt structure
 
-### Step 7: Register Theme
+Use the imagegen shared schema where helpful:
 
-Add to `config.py` THEMES dict:
-```python
-"{theme_key}": {
-    "name": "{Title}",
-    "book_title": "{Full Title}",
-    "prompt_file": "output/{theme_key}/prompts.txt",
-},
+```text
+Use case: illustration-story
+Asset type: Amazon KDP coloring-book interior page
+Primary request: <distinct scene>
+Scene/backdrop: <setting>
+Subject: <subject + invariant traits>
+Style/medium: black-and-white line art, <style bible>
+Composition/framing: <SQUARE 1:1 or PORTRAIT 3:4>, safe no-bleed margin
+Constraints: bold clean closed outlines; white background; easy-to-color open regions; exact subject count
+Avoid: color, gray fill, shading, gradient, border, frame, text, letters, numbers, signature, watermark, mockup, cropped subject, merged anatomy
 ```
 
----
+Adult pages may use coherent layered scenes but must avoid micro-pattern clutter. Kids pages should use one dominant centered subject and age-appropriate open shapes. Multiple characters must be separated with complete visible anatomy.
 
-## Output
+Cover/frontmatter prompts use artwork only:
 
-- `output/{theme_key}/plan.json` — Full plan with metadata + all prompts
-- `output/{theme_key}/prompts.txt` — One prompt per line
+- cover use case: `ads-marketing`;
+- frontmatter use case: `illustration-story`;
+- require intentional negative space for code-rendered text;
+- forbid every word, letter, number, barcode, ISBN, QR code, logo, placeholder box, and mockup.
 
----
+## Required plan fields
 
-## Quality Criteria
+```json
+{
+  "theme_key": "...",
+  "concept": "...",
+  "audience": "adults|kids",
+  "age_range": "...",
+  "page_size": "8.5x8.5|8.5x11",
+  "page_count": 36,
+  "title": "...",
+  "subtitle": "...",
+  "description": "...",
+  "keywords": ["..."],
+  "categories": ["...", "..."],
+  "reading_age": "...",
+  "author": {"first_name": "...", "last_name": "..."},
+  "ai_disclosure": {"interior_images": "ai_generated", "cover_artwork": "ai_generated"},
+  "niche_validation": {},
+  "content_strategy": {
+    "buyer_promise": "...",
+    "style_bible": {},
+    "sections": [],
+    "duplication_matrix": []
+  },
+  "front_matter": {},
+  "frontmatter_art_prompts": {"title": "...", "belongs_to": null, "closing": "..."},
+  "cover_prompt": "text-free front artwork",
+  "back_cover_prompt": "text-free back artwork",
+  "page_prompts": ["..."]
+}
+```
 
-- Title is SEO-friendly and audience-appropriate
-- Description is compelling and marketplace-ready
-- 7 diverse, relevant keywords
-- Cover prompt matches audience style guidelines
-- Every page prompt follows the correct audience guide strictly
-- Page prompts are varied (different scenes, activities, settings)
-- Characters described consistently across all prompts
-- No dense micro-detail instructions in adult prompts
-- No shading/gradient instructions in kids prompts
-
----
-
-## References
-
-- `references/adult-prompt-guide.md` — Cozy & cute adult style (from Hoja 1)
-- `references/kids-prompt-guide.md` — Bold & easy kids style
+Require `page_count == len(page_prompts) == len(duplication_matrix)`, 7 keywords, no empty production fields, and valid JSON. Save to `output/<theme>/plan.json` and `output/<theme>/prompts.txt`.

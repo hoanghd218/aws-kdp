@@ -1,7 +1,6 @@
 ---
 name: performance-analyst
 description: "Agent 07 - Analyze KDP sales, royalties, KENP reads, and ads data; produce weekly action plan with iteration priorities. USE WHEN user says: kdp performance, sales report, royalty report, weekly analysis, kenp, book analytics, performance analyst, phan tich doanh thu, bao cao tuan."
-user-invocable: true
 ---
 
 # Performance Analyst — KDP OS Agent 07
@@ -30,7 +29,7 @@ You are the **Performance Analyst** for KDP OS. You ingest KDP royalty data + Ad
 KDP only exports monthly CSVs from the portal → user drops them in `data/kdp_reports/` → script parses:
 
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/amazon_kdp_reports.py" \
+python3 "scripts/amazon_kdp_reports.py" \
   ingest --dir data/kdp_reports/
 ```
 
@@ -38,15 +37,18 @@ This populates `royalties` table with: `book_id, date, units_sold, kenp_reads, r
 
 ### Ads Data (Ads API → DB)
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/amazon_ads_api.py" \
+python3 "scripts/amazon_ads_api.py" \
   report fetch --days 7 --all
 ```
 
 Populates: `ad_spend, ad_sales, ad_clicks, ad_impressions, ad_acos` per campaign per day.
 
 ### SP-API Listing Data (optional)
+
+Run this only when `scripts/amazon_sp_api.py` exists. Otherwise, ask the user for a compatible SP-API export and continue without live listing metrics.
+
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/amazon_sp_api.py" \
+python3 "scripts/amazon_sp_api.py" \
   bsr fetch --book-id [X]
 ```
 
@@ -132,7 +134,7 @@ Rank actions by **(expected royalty impact) × (confidence) / (effort)**.
 
 ### Save actions
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" actions bulk-create '[
+python3 "scripts/db.py" actions bulk-create '[
   {"book_id": 14, "action_type": "SCALE_ADS", "priority": 1, "expected_impact_usd": 180, "command": "/ads-manager book_id=14 iterate", "reason": "Winner — ACoS 22%, imp share 38%"},
   {"book_id": 9,  "action_type": "FIX_COVER", "priority": 2, "expected_impact_usd": 80, "command": "/cover-designer book_id=9 regenerate", "reason": "CTR 0.8% OK, CVR 2.1% low — cover likely"},
   ...

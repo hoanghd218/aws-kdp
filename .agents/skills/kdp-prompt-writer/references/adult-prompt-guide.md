@@ -1,7 +1,7 @@
 # Adult Coloring Book Prompt Guide (Cozy & Cute Style)
 
 ## Source
-Derived from Hoja 1 super prompts — optimized for Nano Banana Pro on Google AI Studio / Gemini.
+Model-agnostic production guidance for the built-in imagegen workflow.
 
 ---
 

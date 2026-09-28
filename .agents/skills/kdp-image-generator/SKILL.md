@@ -1,114 +1,43 @@
 ---
 name: kdp-image-generator
-description: Generate coloring page images using the configured image renderer (set via IMAGE_RENDERER in .env). USE WHEN user says 'generate coloring pages', 'create coloring images', 'generate images for book', 'run image generation', 'kdp generate images', 'make coloring page images', 'generate pages from plan'.
+description: Generate or regenerate KDP coloring pages from plan.json with the built-in imagegen tool, normalize them to print-ready PNGs, and save every asset in the book output folder. Use for coloring-page generation, missing pages, or targeted page regeneration.
 ---
 
 # KDP Image Generator
 
-Generates coloring book page images using the configured image renderer (from `IMAGE_RENDERER` in `.env`). Supported renderers: `ai33`, `bimai`, `nanopic`. This is the ONLY step that calls an external API — for image generation only, not prompt writing.
+Use the built-in `imagegen` skill by default. It needs no project API key. The older `generate_images.py` provider stack is a legacy fallback and may be used only when the user explicitly asks for that CLI/API path.
 
----
+## Workflow
 
-## When to Use
-
-- After prompts are written (by `kdp-prompt-writer` skill)
-- User wants to generate or regenerate coloring page images
-- The `/project:kdp-create-book` command reaches the generation phase
-
----
-
-## Process
-
-### Step 1: Verify Prerequisites
-
-Check that:
-1. Plan exists: `output/{theme_key}/plan.json`
-2. `.env` has `IMAGE_RENDERER` set (e.g. `bimai`, `ai33`, or `nanopic`) and the corresponding API key (`BIMAI_API_KEY`, `AI33_KEY`, or `NANOPIC_API_KEY`)
-3. Dependencies installed: `pip install Pillow python-dotenv requests`
+1. Read `output/<theme>/plan.json`; verify `page_size`, `page_count`, style bible, and one prompt per page.
+2. Create `output/<theme>/images/`.
+3. For each distinct page prompt, issue one built-in `image_gen` call. Different pages require different calls; do not use one call with `n` as a batch substitute.
+4. Prompt with use case `illustration-story`, intended trim, black-and-white line art, bold closed outlines, white background, safe margins, and explicit exclusions for color, shading, borders, text, watermark, signatures, and mockups. Add an anti-card constraint: draw directly on the white canvas, never as a photograph or scan of a sheet of paper and never inside an inset rectangle, rounded frame, page border, drop shadow, vignette, or gray edge.
+5. Normalize each generated source:
 
 ```bash
-ls output/{theme_key}/plan.json
+python3 scripts/prepare_imagegen_asset.py \
+  --input <source> \
+  --output output/<theme>/images/page_XX.png \
+  --size <8.5x8.5|8.5x11> \
+  --mode line-art
 ```
 
-### Step 2: Run Image Generation
+6. Inspect each saved PNG. Regeneration is non-destructive at the source level; replace the project PNG only after deciding to redo it, using `--overwrite`.
+7. Verify expected dimensions, 300-DPI metadata, nonzero file size, page numbering, and prompt-to-page mapping.
 
-**Plan-based (recommended):**
-```bash
-python generate_images.py --plan output/{theme_key}/plan.json --count {num_pages}
-```
-The script auto-detects `page_size` from the plan JSON (`"8.5x11"` or `"8.5x8.5"`). For 8.5x8.5, images are generated with 1:1 (square) aspect ratio. You can override with `--size 8.5x8.5`.
+## Quality gate
 
-**Theme-based (legacy, for existing themes in config.py):**
-```bash
-python generate_images.py --theme {theme_key} --count {num_pages}
-```
+Every final page must be:
 
-**Resume from a specific page:**
-```bash
-python generate_images.py --plan output/{theme_key}/plan.json --count {num_pages} --start {start_index}
-```
+- pure grayscale line art with a white background;
+- correct ratio and 300-DPI project dimensions;
+- readable bold lines and closed coloring regions;
+- free of text, borders, gray fills, color remnants, anatomy errors, crop artifacts, page-within-page/card effects, rectangular boundary lines, drop shadows, and inset paper frames;
+- consistent with the book's style bible while depicting a unique scene.
 
-### Step 3: Monitor Progress
+After generation, always use `$kdp-image-reviewer` before assembly.
 
-The script outputs:
-- `[page_num/total] Generating: {prompt_preview}...`
-- `Saved: page_XX.png` on success
-- `FAILED: Could not generate image` on failure
+## Fallback rule
 
-Note failed pages for regeneration.
-
-### Step 4: Handle Failures
-
-If pages fail:
-1. The script auto-retries 3 times with delays
-2. If still failing, wait and re-run with `--start` at the failed index
-3. Rate limit: 5 seconds between requests (built-in)
-4. If persistent failures, check API key and quota
-
-### Step 5: Verify Output
-
-```bash
-ls -la output/{theme_key}/images/
-```
-
-Check:
-- Expected number of `page_XX.png` files exist
-- File sizes are reasonable (>50KB each)
-- No zero-byte files
-
----
-
-## Technical Details
-
-- **Renderer**: Configured via `IMAGE_RENDERER` in `.env` (supports: `ai33`, `bimai`, `nanopic`)
-- **Requires**: Corresponding API key in `.env` (`AI33_KEY`, `BIMAI_API_KEY`, or `NANOPIC_API_KEY`)
-- **Override**: Use `--renderer` flag to override the `.env` default
-- **Post-processing**: Grayscale conversion, contrast +2.0, brightness +1.3
-- **Margins**: 0.25" (75px) — image centered on full page
-- **Parallel**: Up to 5 concurrent workers for faster generation
-
-**Page sizes (`--size`):**
-| Size | Dimensions | Aspect Ratio | Pixels (300 DPI) |
-|------|-----------|--------------|------------------|
-| `8.5x11` (default) | 8.5" x 11" portrait | 3:4 | 2550 x 3300 |
-| `8.5x8.5` | 8.5" x 8.5" square | 1:1 | 2550 x 2550 |
-
----
-
-## Output
-
-- `output/{theme_key}/images/page_01.png` through `page_XX.png`
-- Each image: grayscale, 300 DPI, PNG format
-  - 8.5x11: 2550x3300px (portrait)
-  - 8.5x8.5: 2550x2550px (square)
-
----
-
-## Quality Criteria
-
-- All requested pages generated (no missing files)
-- Images are grayscale line art (not photos, not colored)
-- Clean white background
-- Lines are visible and bold
-- No artifacts or distortion
-- No zero-byte or corrupted files
+If built-in imagegen is unavailable, stop and explain that the existing provider CLI requires configured credentials. Do not silently switch renderers. Continue only after the user explicitly chooses the fallback.

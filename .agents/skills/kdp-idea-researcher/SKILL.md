@@ -1,18 +1,17 @@
 ---
 name: kdp-idea-researcher
 description: "Research trending and profitable KDP coloring book ideas using web search, Amazon trends, and seasonal analysis. Can interview the user for preferences. Saves each idea to ideas/ folder. USE WHEN user says 'research coloring book ideas', 'find book ideas', 'kdp idea research', 'what coloring books sell', 'trending coloring books', 'tim y tuong sach', 'nghien cuu y tuong kdp'."
-user-invocable: true
 ---
 
 # KDP Idea Researcher
 
-You research profitable coloring book ideas for Amazon KDP and save each idea as a separate file in the `ideas/` folder. Run the whole workflow yourself in one pass — no sub-agents.
+You discover coloring-book ideas and save each idea in `ideas/`. Discovery is not market validation: web/trend signals may generate candidates, but no idea may be labeled production-ready until `$kdp-niche-finder` validates it with fresh Amazon evidence.
 
 ## Workflow
 
 ### Step 1: Interview (optional but recommended)
 
-Use AskUserQuestion to understand what the user wants:
+Ask the user what they want:
 
 1. **Scope**: Are you looking for ideas for a specific season/holiday, current trends, or evergreen niches?
 2. **Audience**: Adults, kids, or both?
@@ -24,7 +23,7 @@ If the user provided context in their initial message, skip questions that are a
 
 ### Step 2: Research
 
-Use WebSearch to investigate multiple angles:
+Use web search to investigate multiple angles:
 
 #### 2a. Current Amazon KDP Trends
 Search queries to use:
@@ -69,6 +68,8 @@ For each idea, assess:
 
 **Overall score** = average of all factors.
 
+Label this score `DISCOVERY_SCORE`, not profitability. For the top candidates, run `$kdp-niche-finder` and add its evidence confidence and `GO|TEST|NO_GO` production decision. If Amazon data is unavailable, retain `LOW_CONFIDENCE — NOT VALIDATED`.
+
 ### Step 4: Save Ideas
 
 Save each idea as a separate markdown file in `ideas/` with this format:
@@ -84,6 +85,7 @@ season: {evergreen|spring|summer|fall|winter|holiday_name}
 score: {overall_score}/5
 researched: {YYYY-MM-DD}
 status: idea
+validation_status: discovery_only
 ---
 
 # {Topic Name} Coloring Book
@@ -162,3 +164,4 @@ To create a book from any idea, run the kdp-book-creator skill, or batch-plan ev
 - Score conservatively — a 4/5 should be genuinely promising
 - Save ALL researched ideas, even lower-scored ones — they're still useful reference
 - Check existing ideas in `ideas/` folder first to avoid duplicating previous research
+- Never call a web-search trend score "profitable" without the hard-data validation gate

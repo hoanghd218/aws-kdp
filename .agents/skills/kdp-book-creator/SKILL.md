@@ -1,232 +1,255 @@
 ---
 name: kdp-book-creator
-description: Create a KDP coloring book end-to-end (planning, image generation & review, and book assembly) running every step inline — no sub-agents. USE WHEN the user says 'tao sach', 'create coloring book', 'kdp create book', 'build coloring book end to end', 'make a coloring book', 'tao sach to mau', or otherwise asks to produce a complete KDP coloring book from a concept. Trigger even when the user only gives a concept (e.g. "a book about cozy cats") without explicitly naming the pipeline.
-user-invocable: true
+description: "Create a complete KDP coloring book from a concept: commercial validation, plan and polished front matter, built-in imagegen artwork, visual review, PDF assembly, imagegen cover, and KDP preflight. Use when the user asks to create, build, or make a coloring book end to end, including Vietnamese requests such as 'tạo sách tô màu'."
 ---
 
-# KDP Book Creator — End-to-End Pipeline (skills only, no agents)
+# KDP Book Creator
 
-You run the entire pipeline yourself, in one continuous flow. There are **no sub-agents** — every phase is done inline by you, calling other skills where noted. Claude writes ALL prompts and metadata; never call any external LLM API for *writing*.
+Run the pipeline inline. Do not use subagents unless the user explicitly requests delegation. Codex writes all prompts, metadata, and book copy. Use the built-in `imagegen` skill for every generated raster asset; do not call Gemini or a provider CLI unless the user explicitly chooses that fallback.
 
-## Execution Protocol — READ FIRST
+## Execution contract
 
-- Run ALL phases **in sequence without stopping**, except Phase 1 (interview) and Phase 3 (plan review), which require user input.
-- Do **NOT** ask for confirmation between phases. The user invoked the skill — that is the green light.
-- After finishing a phase, **immediately proceed to the next phase in the same turn**. No "ready to continue?", no summary-and-stop.
-- Between phases, emit ONE short progress sentence (e.g. "Plan done, generating images now"), then continue.
-- Stop only when: (a) Phase 5 delivered, (b) a blocking error you cannot recover from, or (c) Phase 1 / Phase 3 needs user input.
+- Pause only for the interview and plan approval.
+- Continue automatically between all other phases.
+- Never leave a project asset only under `$CODEX_HOME/generated_images`; normalize and save it under `output/<theme>/`.
+- Keep interior and front-matter artwork text-free, then render their exact copy with code. For the cover only, follow `$kdp-chatgpt-cover-creator`: bake the exact title, author/brand, and back-cover typography into the generated front/back panels; code may only assemble the wrap and stamp the barcode zone.
+- Do not silently replace built-in imagegen with an API/CLI renderer. If imagegen is unavailable, explain the fallback and wait for explicit approval.
 
 ## Pipeline
 
 ```
-Phase 1: Interview                     (you — pause for user)
-Phase 2: Plan Writing                  (you — write prompts + kdp-book-detail skill)
-Phase 3: Plan Review                   (you — pause for user)
-Phase 4: Images — generate + review    (you — generate_images.py + kdp-image-reviewer criteria + regen loop)
-Phase 5: Assembly + Preflight          (you — build_pdf.py + kdp-cover-creator + kdp-cover-checker)
-   + Deliver                           (you — present to user)
+0. Commercial gate (when profit/niche matters)
+1. Interview                                      [pause]
+2. Product plan + prompts + polished book copy
+3. Plan review                                    [pause]
+4. Built-in imagegen: interiors + front matter
+5. Visual review + targeted regeneration
+6. Interior assembly
+7. Built-in imagegen: cover art + code composition
+8. Preflight + delivery
 ```
 
-Note: `config.THEMES` auto-discovers any `output/{theme_key}/plan.json` — you do **not** register themes in `config.py` anywhere.
+## Phase 0 — Commercial gate
 
----
+If the user wants a profitable book, a niche recommendation, or has not validated the concept:
 
-## Phase 1: Interview (pause for user)
+1. Use `$kdp-niche-finder` before production.
+2. Require fresh Amazon evidence, at least 60% relevant top results, at least 5 usable BSR/review observations, demand depth, no single-winner distortion, and an IP-risk check.
+3. Save the verdict in `plan.json.niche_validation`.
+4. Produce only the flagship first. Do not batch a series until the flagship has real sales/conversion evidence.
 
-Use **AskUserQuestion** to collect:
+If the user explicitly wants a creative/personal project, record `commercial_validation: "user_skipped"` and proceed without pretending the niche is validated.
 
-1. **Concept** — e.g. "cozy cats in a cafe". Skip if passed as invocation args.
-2. **Audience** — Adults (cozy/cute) or Kids (6–12).
-3. **Book size** — 8.5x11 (portrait, default) or 8.5x8.5 (square).
-4. **Page count** — recommend 25–30.
-5. **Theme key** — snake_case slug; suggest one based on concept.
-6. **Author** — first name + last name.
+## Phase 1 — Interview
 
-**→ Once answered, IMMEDIATELY proceed to Phase 2. Do not re-confirm the answers.**
+Collect only missing inputs:
 
----
+1. Concept and differentiating angle.
+2. Audience: adults or kids, with age range for kids.
+3. Trim: `8.5x8.5` (default for bold/easy) or `8.5x11`.
+4. Number of unique coloring pages; recommend 30–40 for a market product.
+5. Theme key (snake_case).
+6. Author/pen name.
+7. Tone/style references and any prohibited subjects.
 
-## Phase 2: Plan Writing
+Proceed immediately once answered.
 
-Write the complete plan yourself in one pass — page prompts + cover prompt + SEO metadata.
+## Phase 2 — Product plan, prompts, and copy
 
-### 2.1 Read the prompt guide
+Read the appropriate prompt guide in `.agents/skills/kdp-prompt-writer/references/` and create `output/<theme>/plan.json`.
 
-- Adults → `.claude/skills/kdp-prompt-writer/references/adult-prompt-guide.md`
-- Kids   → `.claude/skills/kdp-prompt-writer/references/kids-prompt-guide.md`
+### Product and content strategy
 
-### 2.2 Write the cover prompt
+Before writing page prompts, define:
 
-Full-color artwork matching the concept. **Never** bake text into the image — title/subtitle are overlaid later by the cover generator.
+- one-sentence buyer promise;
+- a visual style bible: character/subject invariants, line weight, detail density, palette for cover art, and forbidden elements;
+- a content arc split into 4–6 sections, with deliberate changes in setting, activity, mood, pose, and composition;
+- a duplication matrix proving no two pages repeat the same subject + activity + setting;
+- exact production facts: unique page count, single-sided layout, trim, audience, and media suitability.
 
-### 2.3 Write page prompts
+### Editorial standard
 
-SIZE_TAG:
-- `8.5x8.5` → `"SQUARE format (1:1 aspect ratio)"`
-- `8.5x11`  → `"PORTRAIT orientation (3:4 aspect ratio)"`
+Write book-specific front matter. Generic filler such as “Thank you for being here,” “Made with love,” or a vague introduction is not acceptable.
 
-**Adults** — every prompt starts with:
-```
-Black and white line art illustration for an adult coloring book, cute cozy cottagecore aesthetic, medium detail, bold clean outlines, large open shapes for easy coloring, no shading. NO borders, NO frames, NO rectangular boundary lines around the image. White background. {SIZE_TAG}.
-```
-Structure: Scene / Foreground / Midground / Background. End each prompt with:
-```
-Clean bold outlines, cozy relaxing cottagecore environment, easy-to-color shapes, adult coloring book page. NO borders or frames.
-```
-Large stylized shapes only. NO dense micro-patterns. Minimize characters per scene. If 2+ characters, append:
-```
-IMPORTANT: Each character must have clearly defined, complete body with no overlapping or merged body parts
-```
-Prefer pet companions over a second human character.
-
-**Kids** — bold thick clean outlines, single centered subject filling most of the page, NO shading/gradients/borders/frames, simple enough for crayons and markers. SIZE_TAG must be included.
-
-**All audiences:** ensure variety across settings, activities, moods, and poses. Do not repeat the same scene twice.
-
-### 2.4 SEO metadata via kdp-book-detail skill
-
-Invoke:
-```
-Skill: kdp-book-detail
-args:  "Concept: {concept}, Audience: {audience}, Author: {author_first_name} {author_last_name}, Page count: {page_count}, Page size: {page_size}"
-```
-Collect: Title, Subtitle, Description (HTML), 7 Backend Keywords, 2 BISAC Categories, Reading Age. If the skill fails twice, write the metadata yourself following best-seller Amazon patterns.
-
-### 2.5 Write `output/{theme_key}/plan.json` (fully filled — no empty strings)
+Required `front_matter` fields:
 
 ```json
 {
-  "theme_key": "{theme_key}",
-  "concept": "{concept}",
-  "audience": "{audience}",
-  "page_size": "{page_size}",
+  "title_kicker": "short audience-appropriate promise",
+  "copyright_kicker": "short themed welcome line",
+  "copyright_heading": "A NOTE BEFORE YOU BEGIN",
+  "copyright_message": "2 concise sentences tied to the actual book experience",
+  "instructions_kicker": "short practical promise",
+  "instructions_heading": "HOW TO ENJOY THIS BOOK",
+  "instructions_steps": [
+    {"title": "tool choice", "body": "one useful sentence"},
+    {"title": "page protection", "body": "one useful sentence"},
+    {"title": "coloring technique", "body": "one useful sentence"},
+    {"title": "creative permission", "body": "one useful sentence"}
+  ],
+  "instructions_footer": "one warm, theme-specific closing line",
+  "ownership_heading": "kids only; exact heading",
+  "closing_heading": "theme-specific closing headline",
+  "closing_message": "2–3 warm sentences tied to real scenes or feelings in this book",
+  "review_request": "one neutral request for an honest Amazon review; no rating incentive"
+}
+```
+
+The exact title, subtitle, and author/brand on the title page must match the KDP listing and cover. Read the configured default author from `config.DEFAULT_AUTHOR` when present; never hardcode a legacy brand into prompts or templates.
+
+### Imagegen prompts
+
+Use the `illustration-story` taxonomy for interior/front-matter artwork and `ads-marketing` for cover artwork.
+
+Every coloring prompt must include:
+
+- asset type and intended trim/aspect ratio;
+- scene, subject, style, composition, and detail density;
+- pure black-and-white line art, white background, bold clean closed outlines, no shading/gray/color;
+- no border/frame, text, letters, numbers, signature, watermark, crop marks, or page mockup;
+- anatomy and count invariants;
+- enough safe white margin for no-bleed printing.
+
+Front-matter prompts create artwork only and require usable negative space for deterministic code-rendered copy. Cover prompts are the exception: include a strict `Text (verbatim)` clause so required cover typography is baked into the panel artwork, while forbidding every extra word, incidental label, ISBN, barcode, QR code, blank placeholder box, and mockup.
+
+### Plan schema
+
+```json
+{
+  "theme_key": "...",
+  "concept": "...",
+  "audience": "adults|kids",
+  "age_range": "...",
+  "page_size": "8.5x8.5|8.5x11",
+  "page_count": 36,
   "title": "...",
   "subtitle": "...",
   "description": "...",
-  "keywords": ["...", "..."],
+  "keywords": ["7 exact backend phrases"],
   "categories": ["...", "..."],
-  "reading_age": "...",
-  "author": { "first_name": "{author_first_name}", "last_name": "{author_last_name}" },
-  "cover_prompt": "...",
-  "page_prompts": ["...", "..."]
+  "author": {"first_name": "...", "last_name": "..."},
+  "ai_disclosure": {"interior_images": "ai_generated", "cover_artwork": "ai_generated"},
+  "niche_validation": {},
+  "content_strategy": {
+    "buyer_promise": "...",
+    "style_bible": {},
+    "sections": [],
+    "duplication_matrix": []
+  },
+  "front_matter": {},
+  "frontmatter_art_prompts": {
+    "title": "artwork only",
+    "copyright": "artwork only",
+    "instructions": "artwork only",
+    "belongs_to": "artwork only or null",
+    "closing": "artwork only"
+  },
+  "cover_prompt": "complete front panel with exact baked typography",
+  "back_cover_prompt": "complete back panel with exact baked typography",
+  "page_prompts": ["one distinct structured prompt per page"]
 }
 ```
-Validate it parses as JSON. Also write `output/{theme_key}/prompts.txt` — one prompt per line, in page order.
 
-**→ IMMEDIATELY Read `output/{theme_key}/plan.json` and go to Phase 3.**
+Validate JSON and also write `output/<theme>/prompts.txt`.
 
----
+## Phase 3 — Plan review
 
-## Phase 3: Plan Review (pause for user)
+Show:
 
-Present to the user:
-- Title + Subtitle
-- Description (HTML, show raw — it's short)
-- 7 Keywords, 2 Categories, Reading Age
-- 3–5 sample page prompts
+- niche evidence/confidence and any commercial caveat;
+- title, subtitle, listing description, keywords, categories, author;
+- buyer promise, section arc, style bible, and duplicate-risk summary;
+- exact title-page, page-2 welcome/copyright, page-3 instructions, and closing-page copy;
+- 5 representative page prompts plus front/back cover artwork prompts.
 
-Ask: *"Duyệt để tiếp tục generate images, hoặc cần sửa gì?"*
+Ask for approval to generate. Apply requested edits directly and show the delta.
 
-If changes: edit `plan.json` directly with the Edit tool, re-present the delta, loop until approved.
+## Phase 4 — Generate interiors and front-matter art with imagegen
 
-**→ Once approved, IMMEDIATELY proceed to Phase 4.**
+For each distinct prompt, make one built-in `image_gen` call. Do not use `n` to represent different pages.
 
----
+For each returned coloring-page source:
 
-## Phase 4: Images — generate + review + regen (inline)
-
-### 4.1 Generate
 ```bash
-python generate_images.py --plan output/{theme_key}/plan.json --count {page_count}
+python3 scripts/prepare_imagegen_asset.py \
+  --input <generated-source-path> \
+  --output output/<theme>/images/page_XX.png \
+  --size <page_size> --mode line-art
 ```
-The script auto-handles page size, parallel workers, and retries. `--start N` skips existing pages, so reruns are resumable.
 
-### 4.2 Verify files
+Generate front-matter artwork separately and normalize it to:
+
+```
+output/<theme>/frontmatter/1_artwork.png
+output/<theme>/frontmatter/copyright_artwork.png
+output/<theme>/frontmatter/instructions_artwork.png
+output/<theme>/frontmatter/2_artwork.png   # kids only
+output/<theme>/frontmatter/3_artwork.png
+```
+
+Use `--mode grayscale-art`. Then compose exact text:
+
 ```bash
-ls -la output/{theme_key}/images/
+python3 .agents/skills/kdp-frontmatter-pages/scripts/compose_frontmatter.py <theme>
 ```
-Confirm every `page_01.png` … `page_{page_count:02d}.png` exists and is non-empty. For gaps, re-run `generate_images.py --start N --count 1` (N = missing page index − 1), up to 2 attempts per page.
 
-### 4.3 Review every image
-Open each image with the Read tool (Claude vision). Batch Reads ~5 at a time. Score each page **PASS / WARN / REDO** using the criteria in the `kdp-image-reviewer` skill:
+Record the final prompt set and built-in imagegen as the renderer in the production report.
 
-**CRITICAL (any one ⇒ REDO):** not line art (color/photos/heavy shading); borders/frames/rectangular boundary; AI anatomy errors (missing limbs, extra fingers, merged characters); mirror/reflection duplicate; clothing without a person; gibberish text; body horror; ghost/faint duplicate.
+## Phase 5 — Review every image
 
-**Quality (multiple ⇒ REDO; one minor ⇒ WARN):** lines too thin/broken; too cluttered or too sparse; dense micro-patterns (adults); not single-subject-centered (kids); blurry/distorted; subject doesn't match prompt.
+Open every page with the image-viewing tool. Score PASS/WARN/REDO using `$kdp-image-reviewer`.
 
-### 4.4 Regenerate REDO pages
-For each REDO page XX: `rm output/{theme_key}/images/page_XX.png`, then `python generate_images.py --plan output/{theme_key}/plan.json --start {XX-1} --count 1`, re-review. Retry ONCE more (max 2 regen attempts/page). If still bad, mark **WARN** ("unresolved after 2 regens") and move on.
+Any of these is REDO: color/heavy shading, border, text, broken line art, duplicate/merged anatomy, extra/missing limbs, unintended second figure, distorted object, obvious crop, inconsistent style, or prompt mismatch.
 
-Keep PASS/WARN/REDO-resolved/REDO-unresolved counts. If > 30% of pages are unresolved REDOs, pause and ask the user: ship as-is, or regenerate the whole set with a stronger prompt?
+For a REDO, make one targeted prompt change, regenerate that asset with built-in imagegen, normalize with `--overwrite`, and review again. Maximum two regeneration attempts per page. If more than 20% remain unresolved, stop for a systemic prompt/style correction instead of shipping a weak book.
 
-**→ Otherwise IMMEDIATELY proceed to Phase 5.**
+## Phase 6 — Assemble the interior
 
----
+Use illustrated front matter when available:
 
-## Phase 5: Assembly + Preflight + Deliver (inline)
-
-### 5.1 Build interior PDF
 ```bash
-python build_pdf.py --theme {theme_key} --title "{title}" --subtitle "{subtitle}" --author "{author_first_name} {author_last_name}"
-```
-`--author` is required (KDP needs the author on title + copyright pages to match the cover). Verify `output/{theme_key}/interior.pdf` exists, > 1 MB.
-
-### 5.2 Cover via kdp-cover-creator skill
-```
-Skill: kdp-cover-creator
-args:  "--theme {theme_key} --author \"{author_first_name} {author_last_name}\" --size {page_size} --renderer ai33"
-```
-Verify `cover.png` and `cover.pdf` exist (> 500 KB). For `8.5x8.5`, confirm cover height ≈ 8.75" (not 11.25").
-
-### 5.3 Preflight via kdp-cover-checker skill + manual checks
-```
-Skill: kdp-cover-checker
-args:  "output/{theme_key}/cover.pdf"
-```
-Then manually verify: metadata consistency (title/author match across title page, copyright, cover, spine); interior even page count + correct page size; spine text only if ≥ 79 pages; barcode area clean; 300 DPI; no banned terms ("spiral bound", "leather bound", "hard bound", "calendar") and no promo claims ("best seller", "#1", "guaranteed", "award-winning") in plan.json.
-
-### 5.4 Fix simple failures yourself
-Rerun `build_pdf.py` with corrected flags, rerun cover with correct `--size`, or edit `plan.json` to remove banned terms (then rebuild PDF so the title page matches). Keep fixes conservative — don't hand-edit PDFs. Only escalate if a fix needs user input.
-
-### 5.5 Deliver
-
-```
-BOOK COMPLETE!
-
-Interior PDF: output/{theme_key}/interior.pdf
-Cover:        output/{theme_key}/cover.pdf   (+ cover.png)
-Plan:         output/{theme_key}/plan.json
-  - Title:    {title}
-  - Keywords: {keywords}
-
-KDP PRE-FLIGHT: {pass/fail summary}
-{Unresolved-pages list from Phase 4, if any — label "manual review recommended"}
-
-NEXT STEPS
-1. kdp.amazon.com → New Paperback
-2. Upload interior.pdf + cover.pdf (not PNG)
-3. Trim: {page_size}, No bleed
-4. Copy title / description / 7 keywords / 2 categories / reading age from plan.json
-
-NOTE: KDP limits 10 titles / format / week.
+python3 .agents/skills/kdp-frontmatter-pages/scripts/assemble_frontmatter.py <theme>
+python3 scripts/pdf_qc.py --pdf output/<theme>/interior.pdf --trim <page_size>
 ```
 
----
+Use `scripts/build_pdf.py` only as a polished deterministic fallback. For adult coloring books, default to title page 1, designed welcome/copyright page 2, practical instructions page 3, a layout blank on page 4, then coloring pages on odd right-hand pages with blank backs. End on the closing page; never append a trailing blank solely to force an even manuscript count. Verify title/author consistency, correct trim, right-hand coloring pages, blank backs, and no excessive blank runs.
 
-## Error Handling
+## Phase 7 — Generate and compose the cover
 
-| Failure | Recovery |
-|---|---|
-| kdp-book-detail fails | Write the metadata yourself, continue. |
-| Image generation API fails | Retry once. If > 30% unresolved, pause and ask user. |
-| build_pdf.py fails | Check images exist + plan.json valid; fix and retry. |
-| Cover fails | Check renderer key in `.env`; retry once. |
+1. Generate full-color front and back panel artwork in two separate built-in imagegen calls.
+2. Save sources inside the project as `front_artwork.png` and `back_artwork.png`.
+3. Bake all visible cover typography into the generated front/back artwork. The prompts must declare exact verbatim strings and forbid extra words, incidental labels, barcodes, and placeholders.
+4. Use code only to assemble the wrap, calculate dimensions, blend the spine, and stamp the barcode zone:
 
-Don't stop the chain on soft failures — retry inline. Only surface blockers that genuinely need user input.
+```bash
+python3 .agents/skills/kdp-chatgpt-cover-creator/scripts/compose_chatgpt_cover.py \
+  --theme <theme> \
+  --front output/<theme>/front_artwork.png \
+  --back output/<theme>/back_artwork.png \
+  --no-back-text
+```
 
-## Rules
+Do not add spine text below 79 interior pages. Render the cover PDF to PNG and inspect it at full size and thumbnail size.
 
-- **Never** call any external LLM API for *writing* prompts or metadata — Claude writes everything.
-- Continue in the same turn after each phase. Do not end your turn waiting for a nudge.
-- Only 2 user pauses in the whole pipeline: Phase 1 (interview) and Phase 3 (plan review).
-- For multiple books, use `kdp-batch-planner` (ideas → plans) then `kdp-batch-assembler` (plans → books).
+## Phase 8 — Preflight and delivery
+
+Run the cover checker and quality reviewer. Confirm:
+
+- cover/interior/listing metadata match exactly;
+- cover is one PDF with correct bleed, dimensions, safe zones, and 300-DPI assets;
+- barcode area is clear and contains no placeholder text;
+- every listing claim matches the actual book;
+- no trademarked characters, logos, artist imitation, or misleading claims;
+- the KDP upload is marked **AI-generated** for both interior images and cover artwork;
+- coloring books are not marked low-content by default; Amazon says they are generally not low-content.
+
+Deliver absolute clickable paths for `interior.pdf`, `cover.pdf`, `cover.png`, and `plan.json`, plus PASS/WARN counts and unresolved issues.
+
+## Failure handling
+
+- Built-in imagegen failure: retry once; then report the blocker. Offer CLI/provider fallback only with explicit user approval.
+- Bad generated text: this should not occur because production text is code-rendered. Fix the plan copy or compositor, not the image prompt.
+- Systemic visual failure: revise the style bible/base prompt and regenerate the affected set.
+- Cover/front-matter typo: fix `plan.json` and rerun the deterministic compositor.
+- Never publish or upload automatically; delivery ends with verified local artifacts and upload guidance.

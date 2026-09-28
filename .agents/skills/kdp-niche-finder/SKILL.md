@@ -1,154 +1,125 @@
 ---
 name: kdp-niche-finder
-description: >-
-  Find PROFITABLE, low-competition KDP coloring-book niches using REAL Amazon data (Apify
-  top-10 BSR/reviews/price) and a deterministic Opportunity Score — not vibes. Sweeps many
-  candidate keywords, computes Opp = demand/competition for each, corrects for the common
-  traps (single-winner inflation, off-season seasonal reads, low-demand floors), and returns a
-  ranked, evidence-backed shortlist of money niches plus a 5-10 book series for each. USE THIS
-  whenever the user wants to find/research/validate KDP or coloring-book niches, asks "what
-  book should I make", "find a niche", "is this niche worth it", "tim ngach", "ngach kiem tien",
-  "research niche", "blue ocean niche", wants to AVOID saturated markets, or wants to verify a
-  niche idea with hard Amazon numbers. Prefer this over guessing from WebSearch — Amazon blocks
-  direct page fetches, so Apify is the only reliable hard-data source here.
+description: Discover and validate profitable KDP coloring-book niches with fresh Amazon top-result data, relevance filtering, robust demand/competition statistics, seasonality and IP checks, and a flagship-first launch gate. Use for niche research, market validation, low-competition ideas, or deciding what coloring book to make.
 ---
 
-# KDP Niche Finder — hard-data niche research
+# KDP Niche Finder
 
-Find coloring-book (and low-content) niches that actually make money: **real demand, beatable
-competition, margin headroom.** Every verdict traces to an Apify top-10 pull + a deterministic
-score — never a guess. WebSearch can suggest candidates, but it routinely *overrates* niches
-(e.g. "fishing for men" looks hot but real BSR shows modest demand). Only Apify numbers decide.
+Separate discovery from validation. Web search can generate candidate ideas; only fresh Amazon evidence may approve production.
 
-## The one metric that matters: Opportunity Score
+## Why the old score is insufficient
 
-```
-Opp = avg monthly sales (top-10)  /  avg review count (top-10)
-```
-- **Numerator = DEMAND** — are people actually buying? (from BSR → sales table)
-- **Denominator = COMPETITION BARRIER** — have rivals locked it with reviews?
-- High Opp = real demand AND nobody has cemented dominance = a lane you can break into.
+Do not approve a niche from `average monthly sales / average reviews` alone. A single bestseller, an irrelevant search result, missing reviews, or stale seasonal data can create a false blue-ocean verdict.
 
-| Opp | Meaning |
-|-----|---------|
-| ≥ 5 | 🌊 BLUE_OCEAN — prioritize |
-| 2–5 | 🌤 MODERATE |
-| 0.5–2 | COMPETITIVE |
-| < 0.5 | SATURATED — avoid |
+The canonical V2 gate uses:
 
-**Opp never stands alone.** Three traps make the raw number lie — always sanity-check (see
-`Reading the numbers` below): single mega-seller inflation, off-season seasonal collapse, and a
-low-demand floor where Opp is high only because reviews are ~0 (nobody competing *or* buying).
+- result relevance ratio;
+- number of usable BSR and review observations;
+- median monthly sales, not only the mean;
+- demand depth (`<100k` and `<200k` BSR counts);
+- median reviews;
+- winner concentration (largest estimated seller share);
+- cache age, seasonality, economics, content scalability, and IP risk.
+
+`Opportunity V2 = median monthly sales × demand-depth factor / sqrt(median reviews + 1)` is a ranking aid, never a standalone verdict.
 
 ## Workflow
 
-### Step 0 — Confirm Apify is live (token pool)
-The hard data comes from `scripts/apify_research.py` (Apify `junglee/Amazon-crawler`). It reads
-`APIFY_API_TOKEN` from `.env`, which may be a **comma-separated pool** — the script auto-rotates
-to the next token on HTTP 401/402/403 ("Monthly usage hard limit exceeded"). Quick check:
+### 1. Build specific candidates
+
+Start from user ideas, Amazon shopper language, adjacent sub-angles, and upcoming seasonal demand. Prefer a concrete topic × audience × style/use case. Generic head terms waste data pulls.
+
+Discovery claims from blogs, Pinterest, Etsy, social media, or web search remain `DISCOVERY_ONLY` until Amazon validation.
+
+### 2. Pull fresh Amazon evidence
+
+Check Apify access:
 
 ```bash
-python3 scripts/apify_research.py top10 "frog coloring book for adults" | head -5
+python3 scripts/apify_research.py top10 "frog coloring book for adults" >/dev/null
 ```
-If it prints JSON → live. If all tokens 403 → tell the user Apify credit is exhausted; they must
-top up or add another token to the comma list in `.env`. Do NOT silently fall back to WebSearch
-guesses and present them as hard data — say clearly the result is LOW_CONFIDENCE if you must.
 
-### Step 1 — Build the candidate keyword list
-You need a list of `key,keyword` pairs to sweep. Sources, in order of value:
-1. **The user's ideas** — whatever niches they want validated.
-2. **Category brainstorm** — for a theme (e.g. "male hobbies", "cottagecore", "mental health"),
-   enumerate 8-15 concrete long-tail keywords + audience. Favor SPECIFIC long-tail
-   ("bass fishing coloring book") over generic heads ("coloring book") — heads are always
-   saturated; the money is in the specific intersection a brand hasn't filled.
-3. **Sub-angles of a winner** — once a niche scores well, sweep its species/style/occasion
-   variants to build a 5-10 book SERIES (e.g. fishing → bass, deep-sea, trout, kayak, ice…).
-
-Keep keys snake_case; they become the saved filenames.
-
-### Step 2 — Sweep the keywords (pull real top-10)
-Use the bundled helper — it pulls each keyword (skipping ones already cached), saving each to
-`data/niches/apify/<key>.json`:
+Sweep only candidates the user could act on:
 
 ```bash
-python3 .Codex/skills/kdp-niche-finder/scripts/niche_sweep.py \
-  "bass_fishing=bass fishing coloring book" \
-  "deep_sea_fishing=deep sea fishing coloring book" \
-  "frog_adults=frog coloring book for adults"
+python3 .agents/skills/kdp-niche-finder/scripts/niche_sweep.py \
+  "frog_adults=frog coloring book for adults" \
+  "deep_sea_fishing=deep sea fishing coloring book"
 ```
-Each pull takes ~30-60s. For a large list (10+), **run it in the background** (`run_in_background`)
-and continue once it completes — don't block. Re-running is cheap (cached pulls are skipped), so
-it's safe to resume after an interruption. Conserve Apify credits: only pull what you'll use, and
-reuse the saved JSONs (they persist in `data/niches/apify/`).
 
-### Step 3 — Rank by real Opportunity Score
+New pulls include `researched_at`. Never fabricate Amazon BSR, review, price, title, ASIN, or publisher data. If the pull fails, mark the result `LOW_CONFIDENCE` and do not approve production.
+
+### 3. Rank with conservative gates
+
 ```bash
 python3 scripts/rank_niches.py
-```
-This reads every `data/niches/apify/*.json`, computes avg/min BSR, est. monthly sales (BSR→sales
-table baked in), avg reviews, avg price, and **Opp**, then prints a ranked table with a verdict
-per niche. It also flags `mo<12 ⇒ WEAK/low-demand` regardless of Opp (the low-demand floor).
-
-### Step 4 — Read the numbers (apply judgment, don't trust raw Opp)
-For each high-Opp niche, open its `data/niches/apify/<key>.json` and check `top10_titles` +
-`top10_bsr` + `top10_reviews` to catch the three traps:
-
-- **Single-winner trap.** If `min_bsr` is tiny (e.g. 523) but `avg_bsr` is in the millions, ONE
-  dominant book is carrying the whole average → not a real opening. (Saw this on fly_fishing.)
-- **Seasonal off-season collapse.** Halloween/Christmas niches pulled in June read near-dead
-  (BSR in the millions) because it's off-peak — you CANNOT judge a seasonal niche off-season.
-  Re-pull ~2-3 months before the season, or judge on supply/competition alone. Conversely, a
-  seasonal niche that still ranks live off-season is a STRONG signal.
-- **Low-demand-floor / empty Opp.** Very high Opp driven by `avg reviews ≈ 0` can mean "nobody
-  has cemented it" (good) OR "nobody's buying" (bad). Cross-check the numerator: is anything
-  actually selling (a book under BSR ~100k)? If not, it's low-demand, not blue ocean. Also watch
-  the inverse: a keyword that returns GENERAL results (e.g. "halloween bookstore" returns generic
-  halloween) means no dedicated competitor exists yet — the intersection is genuinely OPEN.
-
-Also weight **demand vs competition together**: a niche with 173 sales/mo at 24 reviews beats one
-with 8 reviews but 6 sales/mo — both are "low competition" but only the first has real money.
-
-### Step 5 — Deliver + save
-Write a ranked shortlist to `data/niches/` (markdown). For the top picks, recommend a 5-10 book
-**series** (each volume a distinct sub-angle/keyword so they don't cannibalize). Save raw pulls
-stay in `data/niches/apify/`. Optionally scaffold per-book briefs under
-`data/niches/production/<NN>-<niche>/` (README + one brief per volume) so work resumes later.
-
-## Output format
-
-```
-🎯 NICHE FINDER — <topic/keywords swept>  (N niches, real Apify data)
-
-RANKED (by Opp, judgment-corrected)
-| # | niche | demand/mo | avg reviews | Opp | verdict | note (trap?) |
-...
-
-✅ POTENTIAL NICHES (survive the traps)
- 1. <niche> — <why: demand × low competition, one-line>
- ...
-❌ AVOID — saturated: <list (huge reviews)> | low-demand: <list> | single-winner: <list>
-
-SERIES for the top pick (5-10 books, distinct sub-angles): <list of volumes + keywords>
-
-NEXT: re-pull the exact keyword right before producing (sub-angles shift weekly); seasonal
-niches need an in-season re-pull. Then /kdp-create-book "<flagship concept>".
+python3 scripts/rank_niches.py --json > data/niches/latest_ranked.json
 ```
 
-## Rules
-- NEVER fabricate BSR/reviews/price. Only report what the Apify pull returns; if Apify is down,
-  say so and mark anything from WebSearch as LOW_CONFIDENCE.
-- ALWAYS sanity-check raw Opp against the three traps before calling something a winner — a
-  pure-number BLUE_OCEAN that's actually a single-winner or off-season read is worse than useless.
-- Prefer SPECIFIC long-tail keywords; generic head terms ("coloring book for adults") are always
-  saturated and waste a pull.
-- For a SERIES, each volume must be a genuinely different sub-angle (species/style/occasion) — KDP
-  forbids duplicate content and near-identical books cannibalize each other.
-- Validate the FLAGSHIP (vol 1) with real sales before batch-producing the rest of a series.
-- Conserve Apify credits: reuse cached `data/niches/apify/*.json`; only pull keywords you'll act on.
-- Re-pull a niche's exact keyword right before producing it — niches shift week to week.
+Default freshness is 30 days; seasonal or fast-moving terms should be repulled closer to production, ideally within 7 days.
 
-## Reference
-- `references/opportunity-score.md` — the BSR→sales table, full math, and worked trap examples.
-- Core scripts (in the repo, not the skill): `scripts/apify_research.py` (token-pool puller),
-  `scripts/rank_niches.py` (ranker). The skill's `scripts/niche_sweep.py` wraps the puller for
-  batch lists.
+### 4. Interpret verdicts
+
+| Verdict | Meaning | Action |
+|---|---|---|
+| `BLUE_OCEAN` | Fresh, relevant, deep demand, beatable median reviews, no dominant outlier | Eligible for deeper validation |
+| `PROMISING` | Some demand depth and reachable competition | Validate economics and differentiation |
+| `COMPETITIVE` | Demand exists but barrier is meaningful | Enter only with a strong product/ads angle |
+| `SINGLE_WINNER` | One listing drives the apparent demand | Do not infer a healthy niche |
+| `IRRELEVANT_RESULTS` | Amazon query drift; results do not match the intended book | Rewrite keyword and repull |
+| `WEAK_DEMAND` | Too few meaningful sellers or low median sales | Avoid or reposition |
+| `RESEARCH_MORE` | Thin/missing evidence | Repull or inspect products manually |
+| `REFRESH_DATA` | Cache too old | Repull before deciding |
+
+No automated verdict replaces manual review of titles/ASINs.
+
+### 5. Complete the production gate
+
+Before marking a niche `GO`, verify:
+
+1. At least 8 top results captured.
+2. At least 60% are dedicated, relevant coloring books for the intended audience.
+3. At least 5 usable BSR observations and 5 review observations.
+4. At least two genuinely selling relevant books, not one outlier.
+5. Median demand is viable and price supports printing cost, royalty, and ads.
+6. Search intent is not split across kids/adults or coloring/activity/fiction products.
+7. Seasonality is evaluated in the correct window.
+8. At least 30 genuinely distinct page concepts exist without duplication.
+9. A clear cover/content gap exists versus the relevant top competitors.
+10. Title, keywords, visual motifs, and concept pass IP/trademark screening.
+
+### 6. Save an evidence packet
+
+Save a markdown or JSON packet under `data/niches/` containing:
+
+- query and research timestamp;
+- relevant competitor table with ASIN/source URLs;
+- V2 metrics, verdict, confidence, and flags;
+- market gap and differentiation hypothesis;
+- rough unit economics and ads assumptions;
+- seasonality and IP notes;
+- `GO`, `TEST`, or `NO_GO` decision;
+- next validation date.
+
+## Launch rule
+
+Produce one flagship first. A high research score is a hypothesis, not proof of conversion. Do not batch a 5–10 book series until the flagship has enough live data to evaluate impressions, click-through rate, conversion, organic sales, ad spend, and returns/reviews.
+
+## Output summary
+
+```text
+NICHE VALIDATION — <keyword> (<date>)
+Data confidence: HIGH | MEDIUM | LOW
+Relevant results: X/10 | usable BSR: X | usable reviews: X
+Median sales/mo: X | <200k depth: X | median reviews: X | winner share: X%
+Verdict: ... | Production decision: GO | TEST | NO_GO
+Gap: ...
+Risks: ...
+Next: produce one flagship with $kdp-book-creator, or repull/reposition.
+```
+
+## References
+
+- `references/opportunity-score.md` explains the approximate BSR conversion and legacy score.
+- `scripts/apify_research.py` pulls Amazon data.
+- `scripts/rank_niches.py` implements the V2 relevance/freshness/robust-statistics gate.

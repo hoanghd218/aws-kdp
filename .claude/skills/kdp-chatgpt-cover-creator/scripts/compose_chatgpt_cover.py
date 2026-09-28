@@ -16,9 +16,11 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 try:
-    from pypdf import PdfReader
+    from pypdf import PdfReader, PdfWriter
+    from pypdf.generic import ArrayObject, DecodedStreamObject, NameObject
 except Exception:  # pragma: no cover - handled at runtime
     PdfReader = None
+    PdfWriter = None
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -53,10 +55,36 @@ def interior_page_count(theme: str, fallback_images: bool = True) -> int:
         images_dir = REPO_ROOT / config.get_images_dir(theme)
         count = len(list(images_dir.glob("page_[0-9][0-9].png"))) if images_dir.exists() else 0
         if count:
-            total = 2 + (count * 2) + 1
-            return total if total % 2 == 0 else total + 1
+            return 2 + (count * 2) + 1
 
     return config.COLORING_PAGES_PER_BOOK * 2 + 4
+
+
+def strip_unused_cover_font(pdf_path: Path) -> None:
+    """Make the raster-only cover PDF contain no unused font resources."""
+    if PdfReader is None or PdfWriter is None:
+        return
+    reader = PdfReader(str(pdf_path))
+    writer = PdfWriter()
+    for page in reader.pages:
+        contents = page.get_contents()
+        if contents is not None:
+            data = contents.get_data().replace(b"BT /F1 12 Tf 14.4 TL ET", b"")
+            stream = DecodedStreamObject()
+            stream.set_data(data)
+            page[NameObject("/Contents")] = stream
+        resources = page.get("/Resources")
+        if resources is not None:
+            resources = resources.get_object()
+            resources.pop(NameObject("/Font"), None)
+            procset = resources.get("/ProcSet")
+            if procset is not None:
+                resources[NameObject("/ProcSet")] = ArrayObject(
+                    item for item in procset if item != NameObject("/Text")
+                )
+        writer.add_page(page)
+    with pdf_path.open("wb") as stream:
+        writer.write(stream)
 
 
 def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
@@ -218,6 +246,20 @@ def draw_barcode_zone(cover: Image.Image, dims: dict, args: argparse.Namespace) 
 
 
 def compose(args: argparse.Namespace) -> None:
+    forbidden_overlays = {
+        "--headline": args.headline,
+        "--feature-line": args.feature_line,
+        "--badge-top": args.badge_top,
+        "--badge-bottom": args.badge_bottom,
+    }
+    used = [name for name, value in forbidden_overlays.items() if value]
+    if used or not args.no_back_text:
+        details = f" Forbidden option(s): {', '.join(used)}." if used else ""
+        raise SystemExit(
+            "Cover typography must already be baked into the generated front/back artwork. "
+            "Compose with --no-back-text; code text overlays are disabled." + details
+        )
+
     theme = args.theme
     plan = load_plan(theme)
     page_size = args.size or plan.get("page_size") or config.DEFAULT_PAGE_SIZE
@@ -225,7 +267,10 @@ def compose(args: argparse.Namespace) -> None:
         raise SystemExit(f"Unsupported page size: {page_size}")
 
     trim = config.get_page_dims(page_size)
-    page_count = args.page_count or interior_page_count(theme)
+    manuscript_page_count = args.page_count or interior_page_count(theme)
+    # KDP calculates an odd-page manuscript as the next even page count when
+    # determining the spine and cover template dimensions.
+    page_count = manuscript_page_count + (manuscript_page_count % 2)
     if args.kdp_width and args.kdp_height:
         spine_width = args.kdp_width - (2 * trim["width_inches"]) - (2 * 0.125)
         dims = calculate_cover_dimensions(page_count, trim_w=trim["width_inches"], trim_h=trim["height_inches"])
@@ -300,10 +345,12 @@ def compose(args: argparse.Namespace) -> None:
     jpeg_buf.seek(0)
     c.drawImage(ImageReader(jpeg_buf), 0, 0, width=page_w_pt, height=page_h_pt)
     c.save()
+    strip_unused_cover_font(pdf_path)
 
     print(f"Cover PNG: {png_path.relative_to(REPO_ROOT)}")
     print(f"Cover PDF: {pdf_path.relative_to(REPO_ROOT)}")
-    print(f"Page count: {page_count}")
+    print(f"Manuscript pages: {manuscript_page_count}")
+    print(f"KDP cover page count: {page_count}")
     print(f"Cover inches: {dims['full_width_inches']:.6f} x {dims['full_height_inches']:.3f}")
     print(f"Cover pixels: {full_w} x {full_h}")
     print(f"Barcode rect px: {barcode_rect}")

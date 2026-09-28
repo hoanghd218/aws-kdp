@@ -1,7 +1,6 @@
 ---
 name: image-post-creator
 description: "Phân tích nội dung bài viết Facebook, đưa ra prompt tạo ảnh minh họa bằng Nano Banana Pro. Hỗ trợ dạng: các bước, so sánh, ẩn dụ, concept."
-version: 5.0.0
 ---
 
 # Facebook Knowledge Post → Image Creator
@@ -344,7 +343,7 @@ Khi nhận bài viết, phân loại tự động theo bảng sau:
 ## Generate
 
 ```bash
-cd .claude/skills/image-post-creator && python3 scripts/generate.py "<prompt>" -o ./generated-$(date +%Y%m%d-%H%M%S).png -ar 1:1 --size 2K -v
+cd .agents/skills/image-post-creator && python3 scripts/generate.py "<prompt>" -o ./generated-$(date +%Y%m%d-%H%M%S).png -ar 1:1 --size 2K -v
 ```
 
 ### Options

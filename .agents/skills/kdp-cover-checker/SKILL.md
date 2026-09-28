@@ -18,7 +18,7 @@ Validate KDP book cover PDFs against Amazon's exact dimension and quality specif
 
 ## When to Run
 
-- After generating covers with `/kdp-cover-creator` or `generate_cover.py`
+- After generating covers with `$kdp-cover-creator` or `generate_cover.py`
 - Before uploading to KDP to catch dimension errors
 - When KDP rejects a cover for wrong dimensions
 - To audit all books in the output/ folder at once
@@ -29,13 +29,13 @@ Execute the checker script:
 
 ```bash
 # Check ALL books in output/
-python .claude/skills/kdp-cover-checker/scripts/check_covers.py
+python .agents/skills/kdp-cover-checker/scripts/check_covers.py
 
 # Check a single book
-python .claude/skills/kdp-cover-checker/scripts/check_covers.py --theme cozy_cats_daily_life
+python .agents/skills/kdp-cover-checker/scripts/check_covers.py --theme cozy_cats_daily_life
 
 # Verbose mode (show all details even for passing books)
-python .claude/skills/kdp-cover-checker/scripts/check_covers.py --verbose
+python .agents/skills/kdp-cover-checker/scripts/check_covers.py --verbose
 ```
 
 ## KDP Cover Specifications
@@ -50,7 +50,9 @@ These are the exact rules the checker validates:
 ```
 spine_width = total_pages * 0.002252"
 ```
-Where `total_pages` = the interior PDF page count (white paper, black ink).
+Where `total_pages` = KDP's calculated page count (white paper, black ink).
+If the interior PDF has an odd page count, KDP rounds it up to the next even
+number for the spine and cover dimensions.
 
 ### Full Cover Dimensions
 ```
@@ -99,12 +101,8 @@ The checker reports for each book:
 - **Width too small**: Usually means spine width wasn't included or page count changed after cover was generated. Regenerate the cover.
 - **Height wrong**: Check if the correct page size (8.5x11 vs 8.5x8.5) was used.
 - **DPI too low**: The cover image was saved at less than 300 DPI. Regenerate with `--dpi 300` or check the source image resolution.
-- **Missing cover.pdf**: Run `/kdp-cover-creator` for that theme.
+- **Missing cover.pdf**: Run `$kdp-cover-creator` for that theme.
 
 ## Page Count Detection
 
-The script determines page count by:
-1. Counting PNG images in `output/{theme}/images/` directory
-2. Calculating total pages: `2 (title + copyright) + (num_images * 2) + 1 (thank you)`, rounded up to even
-
-This matches the logic in `generate_cover.py` and `build_pdf.py`.
+The checker reads the final `interior.pdf` page count first. This is authoritative because illustrated title/ownership/closing pages make the front-matter count variable. It then applies KDP's next-even rounding before calculating the cover. Only when the interior does not exist does it estimate from the number of coloring PNGs.

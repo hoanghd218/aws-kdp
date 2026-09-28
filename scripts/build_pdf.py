@@ -24,7 +24,7 @@ def get_sorted_images(theme: str) -> list[str]:
     image_dir = config.get_images_dir(theme)
     if not os.path.exists(image_dir):
         print(f"Error: Image directory not found: {image_dir}")
-        print(f"Run 'python generate_images.py --theme {theme}' first")
+        print(f"Generate pages with the kdp-image-generator skill first")
         sys.exit(1)
 
     images = sorted(
@@ -43,15 +43,23 @@ def get_sorted_images(theme: str) -> list[str]:
 
 
 def _load_plan_meta(theme: str) -> dict:
-    """Load audience and page_size from plan file."""
+    """Load production metadata and polished front-matter copy from the plan."""
     import json
     plan_path = config.get_plan_path(theme)
-    meta = {"audience": "kids", "page_size": None}
+    meta = {
+        "audience": "kids",
+        "page_size": None,
+        "title": None,
+        "subtitle": None,
+        "concept": "this coloring adventure",
+        "front_matter": {},
+    }
     if os.path.exists(plan_path):
         with open(plan_path) as f:
             plan = json.load(f)
-            meta["audience"] = plan.get("audience", "kids")
-            meta["page_size"] = plan.get("page_size")
+            for key in meta:
+                if key in plan:
+                    meta[key] = plan[key]
     return meta
 
 
@@ -73,9 +81,11 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None,
             size = theme_config["page_size"]
 
     if title is None:
-        title = theme_config["book_title"]
+        title = plan_meta.get("title") or theme_config["book_title"]
     if subtitle is None:
-        if audience == "adults":
+        if plan_meta.get("subtitle"):
+            subtitle = plan_meta["subtitle"]
+        elif audience == "adults":
             subtitle = "A Relaxing Coloring Book for Adults"
         else:
             subtitle = f"Coloring Book for Kids Ages {config.TARGET_AGE}"
@@ -184,10 +194,11 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None,
     # Design label
     y_label = y_after_sub - GAP
     c.setFont("Arial-Italic", 13)
-    if audience == "adults":
-        c.drawCentredString(center_x, y_label, "Cozy & Relaxing Designs")
-    else:
-        c.drawCentredString(center_x, y_label, "Bold & Easy Designs")
+    front_matter = plan_meta.get("front_matter") if isinstance(plan_meta.get("front_matter"), dict) else {}
+    title_kicker = front_matter.get("title_kicker") or (
+        "A Coloring Escape for Adults" if audience == "adults" else "A Coloring Adventure"
+    )
+    c.drawCentredString(center_x, y_label, title_kicker)
 
     # Author name — always below label with fixed gap
     if author:
@@ -227,7 +238,7 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None,
             "",
             "For personal use only. Not for resale.",
             "",
-            "Made with love for creative colorists everywhere!",
+            "Created for personal coloring enjoyment.",
         ]
     else:
         body_lines = [
@@ -238,7 +249,7 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None,
             "",
             "For personal use only. Not for resale.",
             "",
-            "Made with love for creative colorists everywhere!",
+            "Created for personal coloring enjoyment.",
         ]
     y = cy + ch * 0.47
     for line in body_lines:
@@ -281,7 +292,7 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None,
         page_num += 1
         c.showPage()
 
-    # --- Last Page: Thank You For Being Here ---
+    # --- Last Page: book-specific closing page ---
     page_num += 1
     cx, cy, cw, ch = _content_area(page_num)
     center_x = cx + cw / 2
@@ -292,55 +303,60 @@ def build_pdf(theme: str, title: str | None = None, subtitle: str | None = None,
 
     # ── Main header ──
     c.setFont("Arial-Bold", 17)
-    c.drawCentredString(center_x, cy + ch * 0.82, "THANK YOU FOR BEING HERE")
+    closing_heading = front_matter.get("closing_heading") or (
+        "A QUIET MOMENT, BEAUTIFULLY YOURS" if audience == "adults" else "YOU MADE THESE PAGES YOUR OWN!"
+    )
+    c.drawCentredString(center_x, cy + ch * 0.82, closing_heading)
 
     c.setLineWidth(0.4)
     c.line(cx + cw * 0.15, cy + ch * 0.79, cx + cw * 0.85, cy + ch * 0.79)
 
     # ── Welcome paragraph ──
     c.setFont("Arial", 10.5)
-    welcome = [
-        "Choosing this book means so much. Whether you're coloring to unwind,",
-        "to dream, or simply to have a quiet moment for yourself, I hope",
-        "these pages give you exactly what you needed today.",
-    ]
+    concept = str(plan_meta.get("concept") or "this coloring adventure")
+    closing_message = front_matter.get("closing_message") or (
+        f"Thank you for spending time with {concept}. May the colors you chose and the calm you found stay with you beyond these pages."
+        if audience == "adults" else
+        f"Every color, scribble, and bright idea turned these {concept} pages into something only you could create. Keep imagining, keep coloring, and be proud of what you made."
+    )
+    welcome = _wrap_text(closing_message, max_chars=72)
     y = cy + ch * 0.73
     for line in welcome:
         c.drawCentredString(center_x, y, line)
         y -= 15
 
-    # ── Section: SHARE YOUR ARTWORK ──
+    # ── Closing note ──
     y -= 12
     c.setLineWidth(0.3)
     c.line(cx + cw * 0.3, y, cx + cw * 0.7, y)
     y -= 18
     c.setFont("Arial-Bold", 12)
-    c.drawCentredString(center_x, y, "SHARE YOUR ARTWORK")
+    c.drawCentredString(center_x, y, "KEEP CREATING")
     y -= 17
     c.setFont("Arial", 10.5)
     share_lines = [
-        "We would love to see your finished pages!",
-        "Share your colorful creations and tag us on Amazon",
-        "so we can celebrate your beautiful work.",
+        "There is no single right way to color a page.",
+        "Your choices are what make every finished picture original.",
     ]
     for line in share_lines:
         c.drawCentredString(center_x, y, line)
         y -= 15
 
-    # ── Section: LEAVE A REVIEW ──
+    # ── Honest review request (no rating incentive or promotional claim) ──
     y -= 12
     c.setLineWidth(0.3)
     c.line(cx + cw * 0.3, y, cx + cw * 0.7, y)
     y -= 18
     c.setFont("Arial-Bold", 12)
-    c.drawCentredString(center_x, y, "LEAVE A REVIEW")
+    c.drawCentredString(center_x, y, "A SMALL FAVOR")
     y -= 17
     c.setFont("Arial", 10.5)
-    review_lines = [
-        "If you enjoyed this book, a quick review on Amazon",
-        "helps other colorists discover it.",
-        "Your kind words make all the difference — thank you!",
-    ]
+    review_request = front_matter.get("review_request") or (
+        "If you enjoyed the experience, an honest Amazon review helps fellow colorists discover the book."
+        if audience == "adults" else
+        "Grown-ups: if this book brought a happy coloring moment, an honest Amazon review helps other families discover it."
+    )
+    review_lines = _wrap_text(review_request, max_chars=66)
     for line in review_lines:
         c.drawCentredString(center_x, y, line)
         y -= 15

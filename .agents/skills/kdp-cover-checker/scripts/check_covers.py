@@ -45,6 +45,21 @@ def estimate_total_pages(num_images: int) -> int:
     return total
 
 
+def read_pdf_page_count(pdf_path: str) -> int | None:
+    """Read the authoritative interior page count when the PDF exists."""
+    if not os.path.isfile(pdf_path):
+        return None
+    for module_name in ("pypdf", "PyPDF2"):
+        try:
+            module = __import__(module_name, fromlist=["PdfReader"])
+            return len(module.PdfReader(pdf_path).pages)
+        except ImportError:
+            continue
+        except Exception:
+            return None
+    return None
+
+
 def expected_cover_dims(total_pages: int, trim_w: float, trim_h: float) -> dict:
     """Return expected cover dimensions in inches."""
     spine = round(total_pages * PAPER_THICKNESS, 4)
@@ -149,21 +164,29 @@ def check_single_book(theme_dir: str, theme_name: str, verbose: bool = False) ->
     trim_w = PAGE_SIZES[page_size_key]["width"]
     trim_h = PAGE_SIZES[page_size_key]["height"]
 
-    # 2. Count pages
+    # 2. Count pages. The final interior is authoritative because designed
+    # front matter can add a variable number of pages.
     num_images = count_images(theme_dir)
     if num_images == 0:
         # Try to get from plan
         if os.path.isfile(plan_path):
             with open(plan_path) as f:
                 plan = json.load(f)
-                prompts = plan.get("prompts", plan.get("pages", []))
+                prompts = plan.get("page_prompts", plan.get("prompts", plan.get("pages", [])))
                 num_images = len(prompts) if prompts else 25
         else:
             num_images = 25  # default estimate
 
-    total_pages = estimate_total_pages(num_images)
+    interior_path = os.path.join(theme_dir, "interior.pdf")
+    detected_pages = read_pdf_page_count(interior_path)
+    manuscript_pages = detected_pages or estimate_total_pages(num_images)
+    # KDP rounds an odd manuscript page count up to the next even number when
+    # calculating the print cover and spine.
+    total_pages = manuscript_pages + (manuscript_pages % 2)
     result["num_images"] = num_images
+    result["manuscript_pages"] = manuscript_pages
     result["total_pages"] = total_pages
+    result["page_count_source"] = "interior.pdf" if detected_pages else "image estimate"
 
     # 3. Calculate expected dimensions
     expected = expected_cover_dims(total_pages, trim_w, trim_h)
@@ -235,7 +258,8 @@ def format_result(r: dict, verbose: bool = False) -> str:
         suffix = " — " + "; ".join(r["details"])
 
     lines.append(f"[{tag}] {r['theme']}{suffix}")
-    lines.append(f"  Pages: {r['total_pages']} ({r['num_images']} images) | Size: {r['page_size']} | Spine: {expected.get('spine_inches', 0):.3f}\"")
+    pages = f"{r.get('manuscript_pages', r['total_pages'])} manuscript / {r['total_pages']} KDP"
+    lines.append(f"  Pages: {pages} ({r['num_images']} images) | Size: {r['page_size']} | Spine: {expected.get('spine_inches', 0):.3f}\"")
     lines.append(f"  Expected: {expected.get('width_inches', 0):.3f}\" x {expected.get('height_inches', 0):.3f}\"")
     lines.append(f"  Actual:   {actual.get('width_inches', 0):.3f}\" x {actual.get('height_inches', 0):.3f}\"")
 

@@ -20,6 +20,7 @@ Commands:
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 import sys
 import time
@@ -235,6 +236,7 @@ def top10_packet(keyword: str, marketplace: str = "com") -> dict:
 
     packet = {
         "primary_keyword": keyword,
+        "researched_at": datetime.now(timezone.utc).isoformat(),
         "top10_asins":        [p.get("asin") for p in products],
         "top10_titles":       [p.get("title") for p in products],
         "top10_bsr":          [b for b in (_extract_bsr(p) for p in products) if b is not None],

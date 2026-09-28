@@ -14,10 +14,10 @@ import os
 from pathlib import Path
 
 # Gemini API setup
-CLAUDE_ROOT = Path.home() / '.claude'
-sys.path.insert(0, str(CLAUDE_ROOT / 'scripts'))
-PROJECT_CLAUDE = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(PROJECT_CLAUDE / 'scripts'))
+CODEX_ROOT = Path.home() / '.codex'
+sys.path.insert(0, str(CODEX_ROOT / 'scripts'))
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(PROJECT_ROOT / 'scripts'))
 try:
     from resolve_env import resolve_env
     CENTRALIZED_RESOLVER = True
@@ -25,9 +25,9 @@ except ImportError:
     CENTRALIZED_RESOLVER = False
     try:
         from dotenv import load_dotenv
-        load_dotenv(PROJECT_CLAUDE.parent / '.env')
-        load_dotenv(Path.home() / '.claude' / '.env')
-        load_dotenv(Path.home() / '.claude' / 'skills' / '.env')
+        load_dotenv(PROJECT_ROOT / '.env')
+        load_dotenv(CODEX_ROOT / '.env')
+        load_dotenv(Path.home() / '.agents' / 'skills' / '.env')
     except ImportError:
         pass
 

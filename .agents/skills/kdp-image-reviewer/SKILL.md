@@ -5,7 +5,7 @@ description: Review coloring book images for quality and KDP compliance. USE WHE
 
 # KDP Image Reviewer
 
-Claude visually reviews each coloring page image to assess quality, style consistency, and KDP compliance. Uses Claude's multimodal vision to inspect every page directly.
+Codex visually reviews each coloring page image to assess quality, style consistency, and KDP compliance. Use the available image-viewing capability to inspect every page directly.
 
 ---
 
@@ -13,7 +13,7 @@ Claude visually reviews each coloring page image to assess quality, style consis
 
 - After images are generated (by `kdp-image-generator` skill)
 - User wants to check quality before building PDF
-- The `/project:kdp-create-book` command reaches the review phase
+- The `$kdp-book-creator` skill reaches the review phase
 
 ---
 
@@ -52,7 +52,7 @@ theme = '{theme_key}'
 img_dir = f'output/{theme}/images/'
 
 # Detect expected size from plan
-plan_path = f'plans/{theme}_plan.json'
+plan_path = f'output/{theme}/plan.json'
 expected_w, expected_h = 2550, 3300  # default 8.5x11
 if os.path.exists(plan_path):
     plan = json.load(open(plan_path))
@@ -87,13 +87,13 @@ else:
 "
 ```
 
-### Step 3: Claude Visual Review (Core Step)
+### Step 3: Codex Visual Review (Core Step)
 
-**Use the Read tool to open and visually inspect EVERY image file.** Claude can see PNG images directly.
+**Use the available image-viewing tool to open and visually inspect EVERY image file.**
 
 For each image at `output/{theme_key}/images/page_XX.png`:
 
-1. **Read the image** using the Read tool
+1. **Open the image** using the image-viewing tool
 2. **Evaluate** against the criteria below based on audience type
 3. **Score**: PASS, WARN (minor issues but usable), or REDO (must regenerate)
 4. **Note specific issues** if any
@@ -139,6 +139,7 @@ For each image at `output/{theme_key}/images/page_XX.png`:
 - Too cluttered / too sparse
 - Broken or inconsistent line weight
 - Unwanted borders or frames
+- Page-within-page presentation: inset paper/card, rounded rectangle, drop shadow, gray edge, or vignette around the artwork. Mark REDO even when the line art itself is otherwise clean.
 - Subject doesn't match prompt
 - Blurry or distorted areas
 - Overly complex areas that would be frustrating to color
@@ -162,28 +163,25 @@ Then summarize:
 
 ### Step 5: Regenerate Problem Pages
 
-For pages marked REDO, ask the user if they want to regenerate. For each:
+For pages marked REDO in an approved generation run, regenerate with built-in imagegen. For each:
 
-1. Delete the bad image:
+1. Make one targeted adjustment to that page prompt in `output/{theme_key}/plan.json`.
+2. Issue one built-in `image_gen` call for the revised prompt.
+3. Normalize the returned source into the existing project filename:
 ```bash
-rm output/{theme_key}/images/page_XX.png
+python3 scripts/prepare_imagegen_asset.py \
+  --input <generated-source-path> \
+  --output output/{theme_key}/images/page_XX.png \
+  --size <page_size> --mode line-art --overwrite
 ```
-
-2. Optionally adjust the prompt in `output/{theme_key}/plan.json`
-
-3. Regenerate (0-indexed start):
-```bash
-python generate_images.py --plan output/{theme_key}/plan.json --start {XX-1} --count 1
-```
-
-4. **Re-review the regenerated page** by reading it again with the Read tool
+4. **Re-review the regenerated page** with the image-viewing tool.
 
 ---
 
 ## Output
 
 - Visual review report with PASS/WARN/REDO per page
-- Specific issues described from Claude's visual inspection
+- Specific issues described from Codex's visual inspection
 - Regenerated images for REDO pages (after user approval)
 
 ---

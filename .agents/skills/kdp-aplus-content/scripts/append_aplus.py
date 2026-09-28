@@ -7,7 +7,7 @@ at the KDP A+ size 970x600. Idempotent: strips any prior aplus_* items first.
 Creates image_prompts.json if it does not exist yet.
 
 Usage:
-    python3 .claude/skills/kdp-aplus-content/scripts/append_aplus.py <theme_key>
+    python3 .agents/skills/kdp-aplus-content/scripts/append_aplus.py <theme_key>
 """
 import json
 import os

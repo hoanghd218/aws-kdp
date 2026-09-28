@@ -1,7 +1,6 @@
 ---
 name: ads-manager
 description: "Agent 06 - Launch and manage Amazon Ads (Sponsored Products) for KDP books: keyword research, bid strategy, campaign setup, daily pacing. USE WHEN user says: kdp ads, launch ads, amazon ads, sponsored products, ppc, keywords bid, ads manager, tao ads, chay ads kdp."
-user-invocable: true
 ---
 
 # Ads Manager — KDP OS Agent 06
@@ -26,9 +25,9 @@ You are the **Ads Manager** for KDP OS. You design, launch, and iterate Amazon S
 
 ## STEP 0: Load Book + Niche Context
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" books get [book_id]
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" niches get [niche_id]
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" listings get --book_id [book_id]
+python3 "scripts/db.py" books get [book_id]
+python3 "scripts/db.py" niches get [niche_id]
+python3 "scripts/db.py" listings get --book_id [book_id]
 ```
 
 Pull: `asin`, `title`, `list_price`, `niche.primary_keyword`, `niche.secondary_keywords`, `niche.long_tail_keywords`, `listings.keywords` (7 backend).
@@ -135,7 +134,7 @@ Apply to ALL campaigns:
 
 ### If Ads API credentials present:
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/amazon_ads_api.py" \
+python3 "scripts/amazon_ads_api.py" \
   campaign create \
   --book-id [X] \
   --plan output/{theme_key}/ads_plan.json
@@ -151,7 +150,7 @@ Generate the official Amazon Ads bulk upload CSV per Amazon's template:
 
 ## STEP 6: Save Campaign Rows
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" ad_campaigns create '{
+python3 "scripts/db.py" ad_campaigns create '{
   "book_id": [X],
   "campaign_name": "Launch Auto — Cozy Cat Café",
   "campaign_type": "auto",
@@ -175,7 +174,7 @@ Repeat for Campaign 2 and 3.
 
 Pull last 7 days of ads data:
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/amazon_ads_api.py" \
+python3 "scripts/amazon_ads_api.py" \
   report fetch --book-id [X] --days 7
 ```
 
@@ -195,7 +194,7 @@ python3 "/Users/tonytrieu/Documents/KDP OS/scripts/amazon_ads_api.py" \
 
 ### Save iteration
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" ad_campaigns update [id] '{
+python3 "scripts/db.py" ad_campaigns update [id] '{
   "harvested_keywords": [...],
   "new_negatives": [...],
   "bid_adjustments": [...],

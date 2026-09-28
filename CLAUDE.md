@@ -1,5 +1,12 @@
 # CLAUDE.md
 
+> **Canonical pipeline notice (2026-08-10):** The active Codex workflow is
+> `AGENTS.md` + `.agents/skills/kdp-book-creator`, using built-in imagegen for
+> text-free artwork and deterministic code for production text. The
+> `.claude/skills` and provider commands documented below are a legacy
+> compatibility path; do not describe them as the current default and do not
+> silently substitute them for the Codex/imagegen workflow.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
@@ -18,9 +25,9 @@ pip install -r requirements.txt
 # Single book (manual, from repo root):
 python scripts/plan_book.py --concept "cozy cats in a cafe" --audience adults --pages 30 --theme-key cozy_cat_cafe
 python scripts/generate_images.py --plan output/cozy_cat_cafe/plan.json --count 30
-python scripts/build_pdf.py      --theme cozy_cat_cafe --author "BoBo Art"
-python scripts/generate_cover.py --theme cozy_cat_cafe --author "BoBo Art"
-python scripts/pdf_qc.py         --pdf output/cozy_cat_cafe/interior.pdf --trim 8.5x11 --require-even-pages
+python scripts/build_pdf.py      --theme cozy_cat_cafe --author "Lanternleaf Studio"
+python scripts/generate_cover.py --theme cozy_cat_cafe --author "Lanternleaf Studio"
+python scripts/pdf_qc.py         --pdf output/cozy_cat_cafe/interior.pdf --trim 8.5x11
 
 # Batch (scan output/ for books in known states):
 python scripts/batch_generate_images.py [--book <theme_key>] [--ai33-only|--nanopic-only] [--dry-run]

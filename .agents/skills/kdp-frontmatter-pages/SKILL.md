@@ -1,150 +1,95 @@
 ---
 name: kdp-frontmatter-pages
-description: Replace a KDP coloring book's plain text title / copyright / thank-you pages with illustrated front and back matter, add an optional "This Book Belongs To" page, auto-generate the page images with the configured IMAGE_RENDERER, and merge them into interior.pdf. USE WHEN user says 'tao trang bia trong sach', 'frontmatter pages', 'thay trang thank you', 'title page dep', 'this book belongs to page', 'trang dau cuoi sach', 'decorative interior pages', 'lam trang title va thank you', 'ghep frontmatter', 'illustrated title page', 'personalize thank you page', 'generate frontmatter images', 'tu tao anh frontmatter', 'tao anh trang dau cuoi'.
+description: Create polished illustrated title, copyright/welcome, instructions, ownership, and closing pages for a KDP coloring book using built-in imagegen for text-free art and deterministic code for exact copy, then merge and QC the interior. Use for front matter, title pages, copyright pages, instruction pages, thank-you pages, or "This Book Belongs To" pages.
 ---
 
 # KDP Frontmatter Pages
 
-Turn the ugly plain-text title / copyright / thank-you pages into themed
-illustrations that match the book's interior, and optionally add a cute
-"This Book Belongs To" page. Default flow:
-**Codex writes the prompts → Codex generates the PNGs with the configured image
-renderer → Codex merges them into `interior.pdf` → Codex runs QC.**
+Create designed book pages without trusting an image model to spell text. Built-in imagegen supplies themed grayscale artwork; `compose_frontmatter.py` supplies exact title, author, ownership lines, closing copy, and review request.
 
-Fall back to human-in-the-loop only when image generation is unavailable
-(missing `.env` keys, quota/provider failure) or generated text is visibly wrong.
+## 1. Write book-specific copy
 
----
+Read `plan.json`, the content strategy, and several page prompts. Add or improve:
 
-## Phase Routing
-
-| Phase | Trigger | What Codex does |
-|-------|---------|------------------|
-| **1 — Prompts** | "generate frontmatter prompts", "lam prompt trang title/thank you", book has no `frontmatter/*.txt` yet | Read `plan.json`, write personalized prompts to `output/<theme>/frontmatter/1.txt`,`2.txt`,`3.txt` |
-| **2 — Generate images** | "generate frontmatter images", "tu tao anh frontmatter", prompts exist but PNGs are missing | Run the image generation script to create `1.png`, optional `2.png`, and `3.png` |
-| **3 — Merge** | "ghep lai", "ghep frontmatter vao", `frontmatter/1.png` & `3.png` now exist | Inspect images, run the assembly script, run QC |
-
-Always confirm the **theme_key** (folder under `output/`). If unclear, list
-`output/*/plan.json` and ask which book.
-
----
-
-## Phase 1 — Write the prompts
-
-1. Read `output/<theme>/plan.json`. Note: `audience`, `page_size`, `author`,
-   `title`, and skim several `page_prompts` + the `cover_prompt` to capture the
-   **exact visual style** and any **recurring mascots/objects** (e.g. a kawaii
-   teddy bear, balloons, a smiling cake).
-2. Load `references/prompt-templates.md` and fill the bracketed slots so the 3
-   pages clearly belong to THIS book — same style, same characters, real objects
-   from the book mentioned in the thank-you message.
-3. Personalize the copy:
-   - **Title (1)**: short punchy hero title (not the full 60-char KDP title) +
-     genre sub-banner + 3-line subtitle + copyright line.
-   - **Belongs To (2)**: only for kids books; skip for pure adult books.
-   - **Thank You (3)**: warm, theme-specific message + an Amazon-review CTA.
-4. Write prompts to `output/<theme>/frontmatter/{1,2,3}.txt` (create the
-   folder). For adult books, skip `2.txt` unless the user explicitly wants an
-   ownership/dedication page.
-
-**Style is non-negotiable:** square for 8.5x8.5 / portrait 3:4 for 8.5x11;
-grayscale (black line + soft gray) on white; text baked in with EXACT wording;
-no full-page border/frame. See `references/prompt-templates.md`.
-
----
-
-## Phase 2 — Generate frontmatter images
-
-Run from the repo root:
-
-```bash
-python3 .agents/skills/kdp-frontmatter-pages/scripts/generate_frontmatter_images.py <theme_key>
+```json
+"front_matter": {
+  "title_kicker": "specific promise, not generic filler",
+  "copyright_kicker": "short themed welcome line",
+  "copyright_heading": "A NOTE BEFORE YOU BEGIN",
+  "copyright_message": "2 concise sentences tied to the book's actual experience",
+  "instructions_kicker": "short practical promise",
+  "instructions_heading": "HOW TO ENJOY THIS BOOK",
+  "instructions_steps": [
+    {"title": "specific action", "body": "one useful sentence"},
+    {"title": "specific action", "body": "one useful sentence"},
+    {"title": "specific action", "body": "one useful sentence"},
+    {"title": "specific action", "body": "one useful sentence"}
+  ],
+  "instructions_footer": "one warm, theme-specific permission to experiment",
+  "ownership_heading": "THIS BOOK BELONGS TO",
+  "closing_heading": "theme-specific closing headline",
+  "closing_message": "2–3 warm, concrete sentences tied to this book",
+  "review_request": "neutral request for an honest Amazon review"
+}
 ```
 
-Useful flags:
+Reject generic copy such as “Thank you for being here,” “Made with love,” or vague text that could appear in any book. Do not request a positive or five-star rating.
+
+For coloring books, make the four instruction steps genuinely useful: recommend suitable tools, a protective sheet for markers, a simple layering approach, and permission to choose a personal palette. Adapt the wording to the audience and medium instead of copying a generic block unchanged.
+
+## 2. Generate text-free artwork
+
+Read `references/prompt-templates.md`. Make one built-in imagegen call per asset:
+
+- `1_artwork.png`: title-page decoration with central negative space;
+- `copyright_artwork.png`: welcoming copyright-page decoration with central negative space;
+- `instructions_artwork.png`: light perimeter motifs with a clean field for practical guidance;
+- `2_artwork.png`: optional kids ownership-page decoration;
+- `3_artwork.png`: closing-page decoration with central negative space.
+
+Require grayscale line art, correct trim ratio, safe white margins, and no text, letters, numbers, logos, watermark, border, or mockup. Save generated sources to the project and normalize with `scripts/prepare_imagegen_asset.py --mode grayscale-art`.
+
+## 3. Compose exact text
 
 ```bash
-python3 .agents/skills/kdp-frontmatter-pages/scripts/generate_frontmatter_images.py <theme_key> --pages 1,3
-python3 .agents/skills/kdp-frontmatter-pages/scripts/generate_frontmatter_images.py <theme_key> --renderer nanopic
-python3 .agents/skills/kdp-frontmatter-pages/scripts/generate_frontmatter_images.py <theme_key> --overwrite
+python3 .agents/skills/kdp-frontmatter-pages/scripts/compose_frontmatter.py <theme>
 ```
 
-The script reads `IMAGE_RENDERER` from `.env` (same provider stack as
-`scripts/generate_images.py`), loads `frontmatter/*.txt`, generates PNGs into
-the same folder, converts to grayscale, fits to the book trim size, and saves at
-300 DPI.
+Use `--skip-belongs` for adult books. Use `--overwrite` only after reviewing the existing final pages; the script backs up replaced pages.
 
-If the provider fails or credentials are missing, keep the `.txt` files and tell
-the user to generate/save:
+Outputs:
 
-- `1.png` = Title
-- `2.png` = This Book Belongs To, optional
-- `3.png` = Thank You
+- `frontmatter/1.png` — exact title/subtitle/author;
+- `frontmatter/copyright.png` — designed welcome and legal copy;
+- `frontmatter/instructions.png` — exact book-use guidance;
+- `frontmatter/2.png` — kids ownership page, optional;
+- `frontmatter/3.png` — polished closing copy and honest-review request.
 
-## Phase 3 — Merge into the interior
+## 4. Inspect, merge, and QC
 
-1. **Inspect** `frontmatter/1.png` (and `2.png`, `3.png`) with the Read tool.
-   Check: text spelled correctly, grayscale, square/portrait matches trim, art
-   not touching edges. If small print is garbled, ask the user to regenerate
-   that page (the script's plain copyright page still carries the legal text, so
-   minor garbling on title/thank-you art is only cosmetic).
-2. **Run the assembly script** (it backs up the old PDF, upscales the art to
-   300 DPI, keeps coloring pages on right-hand pages with blank backs, forces an
-   even page count):
-   ```bash
-   python3 .agents/skills/kdp-frontmatter-pages/scripts/assemble_frontmatter.py <theme_key>
-   ```
-   Useful flags: `--size 8.5x11|8.5x8.5`, `--author "Name"`, `--age 3-7`,
-   `--no-copyright`.
-3. **QC** the result:
-   ```bash
-   python3 scripts/pdf_qc.py --pdf output/<theme>/interior.pdf --trim <size> --require-even-pages
-   ```
-4. **Visually verify** by rendering a few pages (title, copyright, belongs-to,
-   first coloring page, last/thank-you) and Reading them. Report GO/NO-GO.
+Open each composed PNG and verify spelling, metadata consistency, visual hierarchy, safe margins, and trim ratio. Then run:
 
----
+```bash
+python3 .agents/skills/kdp-frontmatter-pages/scripts/assemble_frontmatter.py <theme>
+python3 scripts/pdf_qc.py --pdf output/<theme>/interior.pdf --trim <size>
+```
 
-## Page order produced
+Render the title, copyright, ownership, first coloring page, last coloring page, and closing page for visual inspection.
 
-`Title(1.png)` → `Copyright(text)` → `This Book Belongs To(2.png, if present)` →
-(blank pad if needed) → coloring pages (right-hand, blank backs) →
-`Thank You(3.png)` as the even last page.
+Default adult page order:
 
----
+`Title (1)` → `Designed welcome/copyright (2)` → `Instructions (3)` → `Blank layout back (4)` → coloring pages on odd right-hand pages with blank backs → `Closing` as the true final page.
 
-## Image conventions
+The page-4 blank is intentional: it is the reverse of the instructions leaf and keeps the first coloring page on a right-hand page. It is not interchangeable with a trailing blank after the closing page.
 
-| File | Page | Required |
-|------|------|----------|
-| `frontmatter/1.png` | Title | ✅ |
-| `frontmatter/2.png` | This Book Belongs To | optional (omit → page skipped) |
-| `frontmatter/3.png` | Thank You | ✅ |
+## Rules
 
-Generate at ≥2550px square (or 2550×3300 portrait). The script grayscales +
-upscales to the trim's pixel target so print is ≥300 DPI.
-
----
-
-## Quality criteria (GO checklist)
-
-- [ ] All text spelled correctly and matches book metadata/author
-- [ ] Style + recurring characters match the interior pages
-- [ ] Grayscale only, white background, no full-page frame
-- [ ] Correct orientation for the trim (square vs portrait)
-- [ ] `pdf_qc.py` verdict = GO (even pages, trim match)
-- [ ] Old interior backed up as `interior_backup_*.pdf`
-
----
-
-## Scripts
-
-- `scripts/generate_frontmatter_images.py` — generate `frontmatter/*.png` from
-  the prompt text files using the configured image renderer.
-- `scripts/assemble_frontmatter.py` — merge frontmatter images + coloring pages
-  into `interior.pdf`. Reads trim/author/age from `plan.json`. Run from repo root.
-
-## References
-
-- `references/prompt-templates.md` — the 3 prompt blueprints + style rules
-  (load during Phase 1).
+- Exact production text is always code-rendered.
+- Every code-rendered heading must be measured against the panel's inner width and auto-scaled or wrapped before saving; never allow ownership, title, instruction, or closing text to clip at the page edge.
+- The legal copyright page stays deterministic and separate.
+- Page 2 should combine welcoming, theme-specific copy with concise deterministic legal text; do not ship a visually raw legal page.
+- Page 3 should contain four concise, practical instructions with clear hierarchy and audience-appropriate language.
+- Front-matter art must match the interior style bible without duplicating a coloring page.
+- The closing page may request an honest review but cannot incentivize, pressure, or specify a star rating.
+- The closing page is the final interior page. Do not append a blank page solely to force an even page count.
+- Built-in imagegen is the default. Do not silently use the legacy provider script.

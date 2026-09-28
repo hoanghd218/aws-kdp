@@ -72,12 +72,12 @@ Trình bày:
 3. **Highlight plan**: Từ nào yellow, từ nào red underline
 4. **Full prompt**: Prompt đầy đủ
 
-Dùng `AskUserQuestion` để confirm.
+Hỏi user để xác nhận.
 
 ## Step 6: Generate
 
 ```bash
-cd .claude/skills/image-post-creator && python3 scripts/generate.py "<prompt>" \
+cd .agents/skills/image-post-creator && python3 scripts/generate.py "<prompt>" \
   -o ./generated-$(date +%Y%m%d-%H%M%S).png \
   -ar 1:1 \
   --size 2K \

@@ -1,14 +1,17 @@
 ---
 name: niche-hunter
 description: "Agent 01 - Blue-Ocean KDP niche research. Finds high-profit, low-competition book niches using 9 data sources + BSR-to-revenue math + Opportunity Score. USE WHEN user says: find KDP niches, kdp niche research, book niche, coloring book niche, low-content niche, activity book niche, blue ocean, bestseller idea, winning niche, what book should I publish, niche hunter, tim niche sach, ngach kdp tiem nang, nghien cuu niche KDP."
-user-invocable: true
 ---
 
 # Niche Hunter — KDP OS Agent 01
 
+## Canonical routing for this repository
+
+Use `$kdp-niche-finder` and the repository-local `scripts/apify_research.py` + `scripts/rank_niches.py` V2 workflow. Do not execute the legacy absolute `/Users/tonytrieu/Documents/KDP OS/...` commands below; they belong to an older external workspace and are retained only as historical reference. A production verdict must pass the canonical freshness, relevance, evidence-depth, outlier, economics, seasonality, content-scale, and IP gates.
+
 You are the **Niche Hunter** for KDP OS. Your job is to find **Blue Ocean** Amazon KDP niches — niches with real demand, weak competition, and margin headroom — so the company only spends production cycles on books that can actually win.
 
-You produce deterministic, data-backed scorecards using WebSearch + the research toolkit `scripts/amazon_research.py`. NEVER return a scorecard based on vibes — every metric must trace back to a WebSearch result or a math formula.
+You produce deterministic, data-backed scorecards using web search + the research toolkit `scripts/amazon_research.py`. NEVER return a scorecard based on vibes — every metric must trace back to a web search result or a math formula.
 
 ## How to Use
 
@@ -30,7 +33,7 @@ Supported categories (for `browse` mode):
 
 Before any research, show the user what we're about to do:
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/amazon_research.py" blueprint
+python3 "scripts/amazon_research.py" blueprint
 ```
 
 Then detect book type from keyword (same rules as before):
@@ -47,13 +50,13 @@ Then detect book type from keyword (same rules as before):
 KDP OS uses a **3-tier data source** strategy. Try each in order, fall through only if unavailable:
 
 1. **🥇 Apify MCP** (`apify-amazon` server — junglee/Amazon-crawler) — primary for all structured Amazon data (BSR, reviews, price, publisher, pages). Fast, structured, deterministic.
-2. **🥈 Apify Python fallback** (`scripts/apify_research.py`) — when running outside Claude Code (cron, CI, batch). Same Apify actor, different invocation.
-3. **🥉 WebSearch** — last-resort fallback when `APIFY_API_TOKEN` is not set. Data may be incomplete or imprecise; surface low-confidence warnings to user.
+2. **🥈 Apify Python fallback** (`scripts/apify_research.py`) — when running outside Codex (cron, CI, batch). Same Apify actor, different invocation.
+3. **🥉 web search** — last-resort fallback when `APIFY_API_TOKEN` is not set. Data may be incomplete or imprecise; surface low-confidence warnings to user.
 
 Before research, confirm which tier is active:
 ```bash
 # If config/.env has APIFY_API_TOKEN set → Apify MCP/Python tier
-grep -q "^APIFY_API_TOKEN=[^[:space:]]" "/Users/tonytrieu/Documents/KDP OS/config/.env" && echo "APIFY ACTIVE" || echo "WEBSEARCH FALLBACK"
+grep -q "^APIFY_API_TOKEN=[^[:space:]]" "config/.env" && echo "APIFY ACTIVE" || echo "WEB FALLBACK"
 ```
 
 When Apify MCP is active, use the MCP tools exposed by the `apify-amazon` server:
@@ -77,10 +80,10 @@ URL: https://www.amazon.com/s?k=<keyword-url-encoded>
 Expected: ≥ 10 dedicated listings in niche
 ```
 
-**WebSearch fallback**:
+**web search fallback**:
 ```
-WebSearch: "<keyword>" amazon.com
-WebSearch: "<keyword>" kdp best seller
+web search: "<keyword>" amazon.com
+web search: "<keyword>" kdp best seller
 ```
 
 If page 1 has **zero dedicated books** in this niche → niche probably doesn't exist. Ask user to refine.
@@ -90,13 +93,13 @@ If page 1 has **zero dedicated books** in this niche → niche probably doesn't 
 Amazon's search dropdown is the single best free source of real shopper phrases. Generate 77+ probes:
 
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/amazon_research.py" autocomplete-seeds "<keyword>" > /tmp/probes.txt
+python3 "scripts/amazon_research.py" autocomplete-seeds "<keyword>" > /tmp/probes.txt
 ```
 
-Then execute WebSearch for a **representative sample of 20-30 probes**. For each probe, note what Amazon suggests. Typical format:
+Then execute web search for a **representative sample of 20-30 probes**. For each probe, note what Amazon suggests. Typical format:
 ```
 Probe: "cozy cat coloring"
-WebSearch: site:amazon.com "cozy cat coloring" OR "cozy cats coloring"
+web search: site:amazon.com "cozy cat coloring" OR "cozy cats coloring"
 → Top phrases harvested:
    - "cozy cat coloring book for adults"
    - "cozy cat bookshop coloring book"
@@ -112,11 +115,11 @@ Collect the **20-30 strongest long-tail phrases**. These become:
 
 Get the URL(s):
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/amazon_research.py" category-urls <slug> --depth 2
+python3 "scripts/amazon_research.py" category-urls <slug> --depth 2
 ```
 
 **Apify tier**: feed each URL to the `apify-amazon` actor with `maxItemsPerStartUrl: 100` — returns full Top-100 in one call.
-**WebSearch fallback**: WebFetch each URL; partial data only.
+**web search fallback**: fetch the web page each URL; partial data only.
 
 For the target keyword, note which books from Top-100 match it, and what rank bands they sit in. Tells you:
 - Whether the niche has **established winners in Top-100** (demand validated)
@@ -131,10 +134,10 @@ Need these fields for **each of the top 10 results**:
 **Apify tier (recommended)**:
 ```bash
 # Via Python wrapper (prints ready-to-evaluate JSON packet):
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/apify_research.py" top10 "<keyword>" > /tmp/top10.json
+python3 "scripts/apify_research.py" top10 "<keyword>" > /tmp/top10.json
 ```
 
-OR, inside Claude Code, call the `apify-amazon` MCP actor with:
+OR, inside Codex, call the `apify-amazon` MCP actor with:
 ```json
 {
   "categoryOrProductUrls": [{"url": "https://www.amazon.com/s?k=<keyword>"}],
@@ -149,9 +152,9 @@ For individual product deep-dive (to fill missing fields like publish_date, publ
 {"categoryOrProductUrls": [{"url": "https://www.amazon.com/dp/<ASIN>"}], "scrapeProductDetails": true}
 ```
 
-**WebSearch fallback** (if APIFY_API_TOKEN not set):
+**web search fallback** (if APIFY_API_TOKEN not set):
 ```
-WebSearch: "<primary keyword>" site:amazon.com
+web search: "<primary keyword>" site:amazon.com
 ```
 Manually extract fields from snippets. Mark data as LOW_CONFIDENCE — reduce demand score by 1-2 points.
 
@@ -163,9 +166,9 @@ From the top 3 bestsellers, note the "Customers who bought this item also bought
 
 **Apify tier**: the `junglee/Amazon-crawler` actor's product response usually includes a `relatedProducts` or `alsoBought` array. Extract it from Step-4 data.
 
-**WebSearch fallback**:
+**web search fallback**:
 ```
-WebSearch: site:amazon.com <asin1> "customers who bought"
+web search: site:amazon.com <asin1> "customers who bought"
 ```
 
 These become **candidate niches for the next `/niche-hunter batch` run** — save them as notes.
@@ -174,7 +177,7 @@ These become **candidate niches for the next `/niche-hunter batch` run** — sav
 
 Amazon is a lagging indicator. These sources are **3-6 months ahead**:
 
-| Source | WebSearch query | What to look for |
+| Source | web search query | What to look for |
 |--------|-----------------|------------------|
 | **Etsy printable bestsellers** | `"<keyword>" site:etsy.com sort by best seller` | Themes Etsy buyers ALREADY buy as printables — these become Amazon books 3-6 mo later |
 | **Pinterest Trends** | `"<keyword>" trends.pinterest.com` OR `"<keyword>" pinterest coloring book` | Visual aesthetic trends ramping now |
@@ -184,11 +187,11 @@ Amazon is a lagging indicator. These sources are **3-6 months ahead**:
 
 ### STEP 7 — IP Risk Pre-scan
 
-WebSearch check for trademark/character/brand conflicts:
+web search check for trademark/character/brand conflicts:
 ```
-WebSearch: "<keyword>" trademark
-WebSearch: "<keyword>" USPTO
-WebSearch: "<brand candidate>" amazon listing removed
+web search: "<keyword>" trademark
+web search: "<keyword>" USPTO
+web search: "<brand candidate>" amazon listing removed
 ```
 
 High-risk flags:
@@ -205,7 +208,7 @@ Assemble the research into a niche JSON packet and pipe it through the evaluator
 
 ```bash
 # Write /tmp/niche.json with the schema below, then:
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/amazon_research.py" evaluate /tmp/niche.json
+python3 "scripts/amazon_research.py" evaluate /tmp/niche.json
 ```
 
 ### STEP 9 — Save + Suggest Next Command
@@ -213,10 +216,10 @@ python3 "/Users/tonytrieu/Documents/KDP OS/scripts/amazon_research.py" evaluate 
 If verdict ≥ WARM:
 ```bash
 # Save to file FIRST (permanent record)
-cp /tmp/niche.json "/Users/tonytrieu/Documents/KDP OS/data/niches/YYYY-MM-DD-<slug>.json"
+cp /tmp/niche.json "data/niches/YYYY-MM-DD-<slug>.json"
 
 # Then save to DB
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" niches create '<full json>'
+python3 "scripts/db.py" niches create '<full json>'
 ```
 
 Suggest: `/trademark-guardian niche_id=<X>` → `/master-orchestrator launch niche_id=<X>`.
@@ -352,7 +355,7 @@ Run all 9 steps for one keyword. Produce one scorecard.
 
 ### Mode B — `/niche-hunter browse <category>` (category mining)
 1. Get category URLs: `python3 scripts/amazon_research.py category-urls <slug> --depth 2`
-2. WebSearch each URL → extract top 50 books
+2. web search each URL → extract top 50 books
 3. **Cluster** the 50 books into 8-15 micro-niches by title theme
 4. For each micro-niche, run a mini-version of Steps 4 + 8 (top-10 snapshot + evaluate)
 5. Output ranked comparison table
@@ -361,15 +364,15 @@ Goal: discover micro-niches within a category that have at least 1-2 bestsellers
 
 ### Mode C — `/niche-hunter autocomplete <seed>` (keyword discovery)
 1. Generate 77 probes via `autocomplete-seeds`
-2. Sample 20-30 probes through WebSearch (for each, note Amazon's dropdown suggestions)
+2. Sample 20-30 probes through web search (for each, note Amazon's dropdown suggestions)
 3. Cluster harvested phrases by shared theme
 4. Return the 15 strongest long-tail keywords + 3-5 candidate niches
 5. Goal: seed the next batch run — the user chooses which clusters to go deep on
 
 ### Mode D — `/niche-hunter competitors <ASIN>` (reverse-engineering)
-1. WebSearch the ASIN page on amazon.com
+1. web search the ASIN page on amazon.com
 2. Extract: title, subtitle, backend keywords (guess from title), categories, price, BSR, reviews
-3. WebSearch "customers who bought this" carousel → 10-20 related ASINs
+3. web search "customers who bought this" carousel → 10-20 related ASINs
 4. For each related ASIN, extract the same fields
 5. **Look for the gap**: what audience / style / occasion does the bestseller NOT cover? That gap is our niche.
 6. Output: 3-5 niche ideas adjacent to the bestseller, ranked by estimated monthly royalty.
@@ -484,7 +487,7 @@ Top 3 recommended for deep-dive or direct launch:
 - ALWAYS print the blueprint at Step 0 so the user sees the methodology
 - ALWAYS run Steps 1-7 BEFORE calling the evaluator — skipping steps = unreliable score
 - ALWAYS collect at least 5 top-10 data points; 10 is ideal. Fewer = WARN + lower confidence
-- ALWAYS use WebSearch for real data. NEVER fabricate BSR, reviews, or prices.
+- ALWAYS use web search for real data. NEVER fabricate BSR, reviews, or prices.
 - ALWAYS save JSON file FIRST to `data/niches/YYYY-MM-DD-<slug>.json`, then DB
 - ALWAYS suggest the next `/command` at the end
 - NEVER issue a HOT rating without at least 2 blue-ocean flags (pure vibes HOT is cheating)

@@ -8,10 +8,12 @@ Expected images in  output/<theme>/frontmatter/ :
     1.png  -> Title page            (REQUIRED)
     2.png  -> This Book Belongs To   (optional — skipped if missing)
     3.png  -> Thank You page         (REQUIRED)
+    copyright.png   -> Designed copyright/welcome page (optional fallback to text)
+    instructions.png -> Practical coloring guide (optional)
 
-The illustrations should already contain their own text (baked in by the image
-model). This script only places them, adds a plain copyright page, keeps
-coloring pages on right-hand pages with blank backs, and forces an even total.
+The final PNGs should already contain deterministic text composed by
+compose_frontmatter.py. This script places them, adds a plain copyright page, keeps
+coloring pages on right-hand pages with blank backs, and ends on the closing page.
 
 Run from the repo root:
     python3 .agents/skills/kdp-frontmatter-pages/scripts/assemble_frontmatter.py <theme_key>
@@ -26,7 +28,7 @@ import os, sys, glob, json, re, argparse, datetime, shutil, time
 
 sys.path.insert(0, "scripts")
 import config
-from PIL import Image
+from PIL import Image, ImageOps
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
@@ -63,12 +65,13 @@ def age_from_title(title, fallback):
     return m.group(1).replace(" ", "") if m else fallback
 
 
-def fm_reader(path, target_px):
+def fm_reader(path, target_size):
     """Grayscale + upscale a frontmatter PNG so it prints at >=300 DPI."""
     im = Image.open(path).convert("L")
-    if im.width < target_px:
-        im = im.resize((target_px, target_px), Image.LANCZOS)
-    return ImageReader(im)
+    im = ImageOps.contain(im, target_size, Image.Resampling.LANCZOS)
+    page = Image.new("L", target_size, 255)
+    page.paste(im, ((target_size[0] - im.width) // 2, (target_size[1] - im.height) // 2))
+    return ImageReader(page)
 
 
 def main():
@@ -87,16 +90,20 @@ def main():
     title_png = os.path.join(fm_dir, "1.png")
     belongs_png = os.path.join(fm_dir, "2.png")
     thanks_png = os.path.join(fm_dir, "3.png")
+    copyright_png = os.path.join(fm_dir, "copyright.png")
+    instructions_png = os.path.join(fm_dir, "instructions.png")
 
     for required in (title_png, thanks_png):
         if not os.path.exists(required):
             sys.exit(f"ERROR: missing required image: {required}")
-    has_belongs = os.path.exists(belongs_png)
+    audience = plan.get("audience", "kids")
+    # Old adult projects may still contain a legacy ownership page. Do not let
+    # that stale asset replace the intentional blank page 4 in the adult flow.
+    has_belongs = audience != "adults" and os.path.exists(belongs_png)
 
     size = args.size or plan.get("page_size") or config.DEFAULT_PAGE_SIZE
     if size not in config.PAGE_SIZES:
         size = config.DEFAULT_PAGE_SIZE
-    audience = plan.get("audience", "kids")
     author = args.author or author_from_plan(plan) or config.DEFAULT_AUTHOR
     age = args.age or age_from_title(plan.get("title", ""), config.TARGET_AGE)
 
@@ -109,6 +116,8 @@ def main():
     front = ["title"]
     if not args.no_copyright:
         front.append("copyright")
+    if os.path.exists(instructions_png):
+        front.append("instructions")
     if has_belongs:
         front.append("belongs")
     # pad so coloring pages start on an odd (right-hand) page
@@ -116,15 +125,13 @@ def main():
         front.append("blank")
 
     total = len(front) + len(images) * 2 + 1
-    if total % 2 != 0:
-        total += 1
 
     dims = config.get_page_dims(size, page_count=total)
     page_w = dims["width_inches"] * inch
     page_h = dims["height_inches"] * inch
     margin = dims["margin_inches"] * inch
     gutter = dims["gutter_margin_inches"] * inch
-    target_px = dims["width_px"]
+    target_size = (dims["width_px"], dims["height_px"])
     print(f"Total pages: {total} | gutter {dims['gutter_margin_inches']}\" outside {dims['margin_inches']}\"")
 
     out_path = config.get_interior_pdf_path(theme)
@@ -171,12 +178,12 @@ def main():
                     if who == "children" else
                     "This coloring book is designed for adults who enjoy relaxing coloring.")
         lines = [
-            f"Copyright (c) {year} {author}. All rights reserved.", "",
+            f"Copyright © {year} {author}. All rights reserved.", "",
             "No part of this book may be reproduced or used in any manner",
             "without written permission of the copyright owner.", "",
             designed, "",
             "For personal use only. Not for resale.", "",
-            "Made with love for creative colorists everywhere!",
+            "Created for personal coloring enjoyment.",
         ]
         c.setFont("Arial", 11)
         yy = page_h * 0.6
@@ -186,11 +193,13 @@ def main():
         c.showPage()
 
     readers = {
-        "title": lambda: fm_reader(title_png, target_px),
-        "belongs": lambda: fm_reader(belongs_png, target_px),
+        "title": lambda: fm_reader(title_png, target_size),
+        "belongs": lambda: fm_reader(belongs_png, target_size),
+        "copyright": lambda: fm_reader(copyright_png, target_size),
+        "instructions": lambda: fm_reader(instructions_png, target_size),
     }
     for kind in front:
-        if kind == "copyright":
+        if kind == "copyright" and not os.path.exists(copyright_png):
             copyright_page()
         elif kind == "blank":
             blank()
@@ -201,13 +210,13 @@ def main():
         image_page(ImageReader(img))   # coloring page (right)
         blank()                         # blank back (left)
 
-    if (page_num + 1) % 2 != 0:
-        blank()
-    image_page(fm_reader(thanks_png, target_px))  # thank you, last page
+    # The closing message is the final interior page. Do not add a trailing
+    # blank page merely to force an even page count.
+    image_page(fm_reader(thanks_png, target_size))
 
     c.save()
     print(f"DONE: {out_path}  ({page_num} pages)")
-    print(f"Next: python3 scripts/pdf_qc.py --pdf {out_path} --trim {size} --require-even-pages")
+    print(f"Next: python3 scripts/pdf_qc.py --pdf {out_path} --trim {size}")
 
 
 if __name__ == "__main__":

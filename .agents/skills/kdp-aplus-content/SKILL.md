@@ -37,7 +37,7 @@ Use the book's real numbers (page count, trim size) and its top keywords woven n
 Run the script to push the 7 A+ image prompts into `image_prompts.json` at **970x600**:
 
 ```bash
-python3 .claude/skills/kdp-aplus-content/scripts/append_aplus.py <theme_key>
+python3 .agents/skills/kdp-aplus-content/scripts/append_aplus.py <theme_key>
 ```
 
 It is idempotent (strips any prior `aplus_*` items first) and creates `image_prompts.json` if absent. It prints the final queue summary.
@@ -78,7 +78,8 @@ BAD A+ content:
 ## References
 
 - `references/aplus-modules.md` — the 7-module pattern, KDP A+ specs, copywriting rules
+- `references/kawaii-style.md` — read when the book uses the kawaii coloring-book visual system
 
 ## Scripts
 
-- `scripts/append_aplus.py` — append A+ prompts into `image_prompts.json`. Run: `python3 .claude/skills/kdp-aplus-content/scripts/append_aplus.py <theme_key>`
+- `scripts/append_aplus.py` — append A+ prompts into `image_prompts.json`. Run: `python3 .agents/skills/kdp-aplus-content/scripts/append_aplus.py <theme_key>`

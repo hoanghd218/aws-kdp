@@ -4,12 +4,11 @@
 
 KDP prints the wrap larger than the finished book, then trims it: the outer
 0.125" (bleed) is removed entirely and the blade can drift another ~0.25". The
-practical safe margin is **0.375" (≈112 px at 300 DPI) from every cover edge** —
-any text inside that band can be shaved off. Code overlays honor
-`SAFE_MARGIN = 0.375"`, but the AI-generated front title/subtitle/author do not
-unless the prompt says so: demand a wide empty margin on all four sides and keep
-all type inside the central ~80% of the panel. Verify in the rendered PNG; if a
-letter is near an edge, re-generate that panel.
+practical safe margin is **0.375" (≈112 px at 300 DPI) from every cover edge**.
+All visible front/back typography must be baked into the generated artwork.
+Keep every letter and complete banner/badge inside the central 72-75% of its
+panel. Verify the source and safe-zone overlay; regenerate the panel if one
+letter is wrong or crosses the red safe line. Never repair it with a code overlay.
 
 ## Prompt-Generated Barcode Zones
 
@@ -17,7 +16,17 @@ Do not prompt image generation to leave a blank barcode/stamp area. Models often
 
 ## Back Cover Text
 
-For stable headline or feature text, prefer code overlays. Use generated text only when the user explicitly wants the text to be part of the illustration.
+Bake the exact headline/tagline into the generated back artwork. Compose with
+`--no-back-text`. Headline, feature, badge, title, subtitle, and author overlay
+flags are forbidden because they create a cover assembled from separate text.
+
+## Preview Grid vs Barcode
+
+The generated back artwork must not reserve a white barcode box, but the preview
+grid still needs to avoid the deterministic barcode zone. Keep every card above
+approximately 68-70% of panel height and fill the bottom 25% with continuing
+themed decoration. After composition, confirm the stamped barcode box does not
+cover a card border or focal object.
 
 ## Page Count
 

@@ -9,11 +9,11 @@ Two things eat into the edges:
 2. **Cut drift** — the blade can wander another **~0.25"** in either direction.
 
 So the practical safe margin is **0.375" (≈112 px at 300 DPI) from every cover
-edge**. Any text inside that band can be shaved or sliced. The compose script's
-code overlays (back headline, feature line, badge, barcode) already honor the
-`SAFE_MARGIN = 0.375"` from `scripts/generate_cover.py`. The risk is the
-**front cover title/subtitle/author**, because those are baked into the AI
-artwork — the script cannot pull them inward after the fact.
+edge**. Any text inside that band can be shaved or sliced. All visible front and
+back typography is baked into the generated artwork, so the prompt and visual
+review must protect every title, subtitle, author, headline, tagline, badge, and
+complete banner outline. The composer cannot pull baked text inward afterward
+and must never repair it with a separate code overlay.
 
 Fix it in the prompt, every single time: tell `image_gen` to leave a wide empty
 margin on all four sides and keep all type inside the central ~80% of the panel,
@@ -29,10 +29,17 @@ artwork, then let the compose script stamp exactly one white barcode zone
 
 ## Back Cover Text
 
-For stable headline / feature / badge text, prefer the code overlays
-(`--headline`, `--feature-line`, `--badge-top/--badge-bottom`) — they stay crisp
-and land inside the safe margin. Use AI-rendered text only when the user
-explicitly wants it as part of the illustration.
+Bake the exact headline/tagline into the generated back artwork. Compose with
+`--no-back-text`. Do not use `--headline`, `--feature-line`,
+`--badge-top`, or `--badge-bottom`; visible cover typography must never be added
+as a separate code layer.
+
+## Preview Grid vs Barcode
+
+Do not prompt a blank barcode box, but keep every preview card above
+approximately 68-70% of panel height. Fill the bottom 25% with continuing
+themed artwork so the deterministic barcode stamp does not cover a card border
+or an important focal object. Always inspect the composed wrap.
 
 ## Page Count
 

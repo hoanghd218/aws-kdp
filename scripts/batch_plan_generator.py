@@ -2,7 +2,7 @@
 """
 Batch Plan Generator - Creates plan.json for all 81 pending ideas.
 All prompts written by Claude (no AI generation).
-Author: BoBo Art | Page size: 8.5x8.5 (square) | Pages: 50 per book
+Author: Lanternleaf Studio | Page size: 8.5x8.5 (square) | Pages: 50 per book
 """
 
 import json
@@ -15,7 +15,7 @@ IDEAS_DIR = os.path.join(BASE_DIR, "ideas")
 DONE_DIR = os.path.join(IDEAS_DIR, "done")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 
-AUTHOR = {"first_name": "BoBo", "last_name": "Art"}
+AUTHOR = {"first_name": "Lanternleaf", "last_name": "Studio"}
 PAGE_SIZE = "8.5x8.5"
 SIZE_TAG = "SQUARE format (1:1 aspect ratio)"
 PAGE_COUNT = 50

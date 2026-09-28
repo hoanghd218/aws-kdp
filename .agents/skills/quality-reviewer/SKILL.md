@@ -1,7 +1,6 @@
 ---
 name: quality-reviewer
 description: "Agent 05 - Audit interior PDF + cover + listing against KDP rules; produce GO / NO-GO checklist before publish. USE WHEN user says: quality review, kdp qa, check book, audit book, pre-publish check, go no go, quality reviewer, kiem tra sach, audit kdp."
-user-invocable: true
 ---
 
 # Quality Reviewer — KDP OS Agent 05
@@ -24,10 +23,10 @@ KDP manual review takes 48-72 hours AND rejects for picky reasons. Your job is t
 
 ## STEP 0: Load All Artifacts
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" books get [book_id]
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" manuscripts get --book_id [book_id]
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" covers get --book_id [book_id]
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" listings get --book_id [book_id]
+python3 "scripts/db.py" books get [book_id]
+python3 "scripts/db.py" manuscripts get --book_id [book_id]
+python3 "scripts/db.py" covers get --book_id [book_id]
+python3 "scripts/db.py" listings get --book_id [book_id]
 ```
 
 ---
@@ -36,7 +35,7 @@ python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" listings get --book_id
 
 ### A.1 Dimensions & Pages
 - [ ] Trim size matches `books.page_size`
-- [ ] Page count is EVEN (KDP requirement)
+- [ ] The closing/thank-you page is the final manuscript page; no artificial trailing blank was added solely to force an even page count
 - [ ] All pages are the same size (no accidental variants)
 - [ ] No bleed on interior (bleed only applies if book has full-page images to edge — coloring books usually no-bleed)
 
@@ -60,10 +59,9 @@ Delegate to `anthropic-skills:kdp-image-reviewer` if not already done:
 
 ### Commands
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/pdf_qc.py" \
+python3 "scripts/pdf_qc.py" \
   --pdf output/{theme_key}/interior.pdf \
   --trim {page_size} \
-  --require-even-pages \
   --min-line-weight 0.75pt
 ```
 
@@ -94,10 +92,11 @@ python3 "/Users/tonytrieu/Documents/KDP OS/scripts/pdf_qc.py" \
 - [ ] Cover subtitle EXACTLY matches listing.subtitle (if shown on cover)
 - [ ] Cover author name EXACTLY matches interior AND listing.author
 - [ ] Ages / audience indicator consistent (e.g., "for Adults" everywhere)
+- [ ] All visible cover typography is baked into the imagegen artwork; the wrap compositor did not overlay title, author, subtitle, or back copy
 
 ### Commands
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/pdf_qc.py" \
+python3 "scripts/pdf_qc.py" \
   --pdf output/{theme_key}/cover.pdf \
   --cover \
   --expected-width {full_width} \
@@ -137,9 +136,15 @@ python3 "/Users/tonytrieu/Documents/KDP OS/scripts/pdf_qc.py" \
 
 ### C.5 Price Sanity
 - [ ] List price within $4.99–$12.99 (KDP paperback sweet spot)
-- [ ] Royalty calc viable: `royalty = (list − printing_cost) × 0.60` for 60% rate
-  - 52-page coloring book @ $8.99: printing ≈ $2.65 → royalty ≈ $3.80
+- [ ] Royalty calc uses current KDP formula: `(royalty rate × list price) − printing cost`
+  - Amazon.com paperbacks at $9.98 or below use 50%; $9.99 or above use 60%
+  - Both 8.5x8.5 and 8.5x11 are large-trim; use the large-trim printing table
 - [ ] Price matches nicheniche.recommended_list_price_usd within $1
+
+### C.6 Content classification and AI disclosure
+- [ ] Typical coloring book is NOT marked low-content; Amazon generally excludes coloring books from low-content classification
+- [ ] KDP AI-generated disclosure is set for cover and interior artwork created by imagegen
+- [ ] Human review confirms all AI-generated content complies with IP and customer-experience rules
 
 ---
 
@@ -169,7 +174,7 @@ Block publish if any HIGH-risk flag.
 
 ### Save QA Report
 ```bash
-python3 "/Users/tonytrieu/Documents/KDP OS/scripts/db.py" qa_reports create '{
+python3 "scripts/db.py" qa_reports create '{
   "book_id": [X],
   "verdict": "NO_GO",
   "critical_issues": [
@@ -239,7 +244,7 @@ NEXT STEPS
 - NEVER issue GO if any CRITICAL issue exists
 - ALWAYS suggest the exact fix command for each issue
 - Save QA report to DB even on GO — useful for audit trail
-- If `/trademark-guardian` is unavailable in this project, WARN user and do manual check via WebSearch
+- If `$trademark-guardian` is unavailable in this project, warn the user and do a manual check via web search
 - For coloring books: line weight audit is non-negotiable — delegate to `kdp-image-reviewer`
 - For low-content books: skip line-weight checks (no line art) but verify template consistency
 - For activity books: verify solution pages exist and answer keys match
