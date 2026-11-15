@@ -71,10 +71,12 @@ Open each composed PNG and verify spelling, metadata consistency, visual hierarc
 
 ```bash
 python3 .agents/skills/kdp-frontmatter-pages/scripts/assemble_frontmatter.py <theme>
-python3 scripts/pdf_qc.py --pdf output/<theme>/interior.pdf --trim <size>
+python3 scripts/pdf_qc.py --pdf output/<theme>/interior.pdf --trim <size> \
+  --plan output/<theme>/plan.json --verify-image-order
 ```
 
 Render the title, copyright, ownership, first coloring page, last coloring page, and closing page for visual inspection.
+When `plan.json` includes `page_order`, the assembler follows it without renaming image files; the PDF QC command verifies the exact embedded image sequence and blank backs.
 
 Default adult page order:
 

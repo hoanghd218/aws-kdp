@@ -2,13 +2,25 @@
 
 ## Trim-Safe Text (text too close to the edge gets cut)
 
-KDP prints the wrap larger than the finished book, then trims it: the outer
-0.125" (bleed) is removed entirely and the blade can drift another ~0.25". The
-practical safe margin is **0.375" (≈112 px at 300 DPI) from every cover edge**.
-All visible front/back typography must be baked into the generated artwork.
-Keep every letter and complete banner/badge inside the central 72-75% of its
-panel. Verify the source and safe-zone overlay; regenerate the panel if one
-letter is wrong or crosses the red safe line. Never repair it with a code overlay.
+Separate the background bleed from content safety. Background illustration extends
+0.125 inches beyond the trim on the outside edges. KDP requires front/back text
+at least 0.125 inches inside the trim, with no text extending into the spine.
+Use the book's KDP template to check important image placement too.
+Source: https://kdp.amazon.com/en_US/help/topic/G201953020
+
+Prompt for roughly 5-7% panel-edge clearance around lettering, text-bearing
+banners/badges, and important subjects as a practical generation target, then
+verify the final physical dimensions. This percentage is not an Amazon rule.
+Background scenery and expendable decorations should reach all edges.
+Do not impose central 72-75% placement or a fixed author height on every design.
+
+If text or a focal subject is too close to the edge, revise the prompt or make a
+targeted imagegen edit to that element. Preserve the approved full-bleed scene.
+Never shrink the complete panel, add blurred/mirrored padding, or crop inward.
+The diagnostic checker's default 0.375-inch margin is conservative; use an
+explicit `--safe-in 0.125` for the minimum text check. Decorative ink in a margin
+is not proof that text is unsafe. Inspect the actual lettering and focal subjects.
+Never repair generated typography with a code overlay.
 
 ## Prompt-Generated Barcode Zones
 

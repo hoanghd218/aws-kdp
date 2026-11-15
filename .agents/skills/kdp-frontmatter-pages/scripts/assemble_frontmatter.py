@@ -35,11 +35,25 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
+def font_path(*candidates):
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    raise FileNotFoundError(f"No usable font found: {candidates}")
+
+
+REGULAR_FONT = font_path("C:/Windows/Fonts/arial.ttf",
+                         "/System/Library/Fonts/Supplemental/Arial.ttf",
+                         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 FONTS = [
-    ("Arial", "/System/Library/Fonts/Supplemental/Arial.ttf"),
-    ("Arial-Bold", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
-    ("Arial-Italic", "/System/Library/Fonts/Supplemental/Arial Italic.ttf"),
-    ("Helvetica", "/System/Library/Fonts/Supplemental/Arial.ttf"),
+    ("Arial", REGULAR_FONT),
+    ("Arial-Bold", font_path("C:/Windows/Fonts/arialbd.ttf",
+                             "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+                             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")),
+    ("Arial-Italic", font_path("C:/Windows/Fonts/ariali.ttf",
+                               "/System/Library/Fonts/Supplemental/Arial Italic.ttf",
+                               "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf")),
+    ("Helvetica", REGULAR_FONT),
 ]
 
 
@@ -110,6 +124,21 @@ def main():
     images = sorted(glob.glob(os.path.join(config.get_images_dir(theme), "page_*.png")))
     if not images:
         sys.exit(f"ERROR: no coloring images in {config.get_images_dir(theme)}")
+    page_order = plan.get("page_order")
+    if page_order is not None:
+        image_by_number = {
+            int(re.search(r"page_(\d+)\.png$", path).group(1)): path
+            for path in images
+            if re.search(r"page_(\d+)\.png$", path)
+        }
+        if (not isinstance(page_order, list) or
+                any(type(number) is not int for number in page_order) or
+                len(page_order) != len(images) or
+                len(set(page_order)) != len(page_order) or
+                set(page_order) != set(image_by_number)):
+            sys.exit("ERROR: plan.json page_order must list every coloring-page number exactly once")
+        images = [image_by_number[number] for number in page_order]
+        print(f"Coloring-page order: {page_order}")
     print(f"Coloring pages: {len(images)} | size: {size} | author: {author} | belongs page: {has_belongs}")
 
     # --- front-matter page list (each entry rendered on its own page) ---

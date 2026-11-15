@@ -12,13 +12,16 @@ description: Assemble reviewed coloring pages and polished front matter into a K
 - composed title page, designed welcome/copyright page 2, and four-step instructions page 3;
 - exact title, subtitle, author, trim, and page count finalized.
 
+Run `python scripts/coloring_image_qc.py output/<theme>` before assembly to catch wrong dimensions, color mode, and full-page frames. Its PASS does not replace visual review for anatomy or stray words.
+
 ## Interior
 
 Prefer the designed front-matter path:
 
 ```bash
 python3 .agents/skills/kdp-frontmatter-pages/scripts/assemble_frontmatter.py <theme>
-python3 scripts/pdf_qc.py --pdf output/<theme>/interior.pdf --trim <size>
+python3 scripts/pdf_qc.py --pdf output/<theme>/interior.pdf --trim <size> \
+  --plan output/<theme>/plan.json --verify-image-order
 ```
 
 Use `scripts/build_pdf.py` only when illustrated front matter is unavailable. Verify title/author consistency, the designed page 2 and page 3, all coloring pages, right-hand coloring pages with blank backs, correct trim, embedded fonts, and no excessive blank sequence. The closing/thank-you page must be the final manuscript page; never append a trailing blank merely to make the PDF page count even.

@@ -38,16 +38,19 @@ def parse_author(value: object) -> str:
 def font(size: int, bold: bool = False, italic: bool = False) -> ImageFont.FreeTypeFont:
     if bold:
         candidates = (
+            "C:/Windows/Fonts/arialbd.ttf",
             "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         )
     elif italic:
         candidates = (
+            "C:/Windows/Fonts/ariali.ttf",
             "/System/Library/Fonts/Supplemental/Arial Italic.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
         )
     else:
         candidates = (
+            "C:/Windows/Fonts/arial.ttf",
             "/System/Library/Fonts/Supplemental/Arial.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         )
